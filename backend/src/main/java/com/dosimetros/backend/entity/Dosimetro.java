@@ -1,21 +1,15 @@
 package com.dosimetros.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @Table(name = "dosimetro")
-@Getter @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Dosimetro {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    // Número físico grabado — PUEDE REPETIR entre distintos dosímetros
     @Column(nullable = false)
     private Integer numero;
 
@@ -23,29 +17,98 @@ public class Dosimetro {
     @JoinColumn(name = "tipo_dosimetro_id", nullable = false)
     private TipoDosimetro tipoDosimetro;
 
-    // NULL cuando el dosímetro está "sin armar"
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tipo_porta_id")
     private TipoPorta tipoPorta;
 
-    // NULL para dosímetros OSL
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tarea_id")
     private Tarea tarea;
 
-    // NULL para OSL
     @Column(name = "numero_bandeja")
     private Integer numeroBandeja;
 
-    // NULL para OSL
     @Column(name = "slot_bandeja")
     private Integer slotBandeja;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    @Builder.Default
-    private EstadoDosimetro estado = EstadoDosimetro.disponible;
+    private String estado = "disponible";
 
     @Column(length = 500)
     private String observacion;
+
+    public Dosimetro() {
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public Integer getNumero() {
+        return numero;
+    }
+
+    public void setNumero(Integer numero) {
+        this.numero = numero;
+    }
+
+    public TipoDosimetro getTipoDosimetro() {
+        return tipoDosimetro;
+    }
+
+    public void setTipoDosimetro(TipoDosimetro tipoDosimetro) {
+        this.tipoDosimetro = tipoDosimetro;
+    }
+
+    public TipoPorta getTipoPorta() {
+        return tipoPorta;
+    }
+
+    public void setTipoPorta(TipoPorta tipoPorta) {
+        this.tipoPorta = tipoPorta;
+    }
+
+    public Tarea getTarea() {
+        return tarea;
+    }
+
+    public void setTarea(Tarea tarea) {
+        this.tarea = tarea;
+    }
+
+    public Integer getNumeroBandeja() {
+        return numeroBandeja;
+    }
+
+    public void setNumeroBandeja(Integer numeroBandeja) {
+        this.numeroBandeja = numeroBandeja;
+    }
+
+    public Integer getSlotBandeja() {
+        return slotBandeja;
+    }
+
+    public void setSlotBandeja(Integer slotBandeja) {
+        this.slotBandeja = slotBandeja;
+    }
+
+    public String getEstado() {
+        return estado;
+    }
+
+    public void setEstado(String estado) {
+        this.estado = estado;
+    }
+
+    public String getObservacion() {
+        return observacion;
+    }
+
+    public void setObservacion(String observacion) {
+        this.observacion = observacion;
+    }
 }

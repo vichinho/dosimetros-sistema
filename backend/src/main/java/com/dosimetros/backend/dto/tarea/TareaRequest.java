@@ -1,35 +1,24 @@
-package com.dosimetros.backend.entity;
+package com.dosimetros.backend.dto.tarea;
 
-import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-@Entity
-@Table(name = "tarea")
-public class Tarea {
+public class TareaRequest {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
-
-    @Column(name = "numero_tarea", nullable = false, length = 100)
+    @NotBlank(message = "El número de tarea es obligatorio")
+    @Size(max = 100, message = "El número de tarea no puede superar 100 caracteres")
     private String numeroTarea;
 
-    @Column(name = "fecha_creacion", nullable = false)
+    @NotNull(message = "La fecha de creación es obligatoria")
     private LocalDate fechaCreacion;
 
-    @Column(length = 500)
+    @Size(max = 500, message = "La observación no puede superar 500 caracteres")
     private String observacion;
 
-    public Tarea() {
-    }
-
-    public Integer getId() {
-        return id;
-    }
-
-    public void setId(Integer id) {
-        this.id = id;
+    public TareaRequest() {
     }
 
     public String getNumeroTarea() {

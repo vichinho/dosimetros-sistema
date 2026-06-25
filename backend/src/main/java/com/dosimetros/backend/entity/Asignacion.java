@@ -1,16 +1,11 @@
 package com.dosimetros.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "asignacion")
-@Getter @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Asignacion {
 
     @Id
@@ -37,7 +32,6 @@ public class Asignacion {
     @JoinColumn(name = "tipo_porta_id", nullable = false)
     private TipoPorta tipoPorta;
 
-    // Formato: "1T2025", "2T2026"
     @Column(nullable = false, length = 20)
     private String trimestre;
 
@@ -46,4 +40,79 @@ public class Asignacion {
 
     @Column(name = "link_trello", length = 500)
     private String linkTrello;
+
+    public Asignacion() {
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public Dosimetro getDosimetro() {
+        return dosimetro;
+    }
+
+    public void setDosimetro(Dosimetro dosimetro) {
+        this.dosimetro = dosimetro;
+    }
+
+    public Cliente getCliente() {
+        return cliente;
+    }
+
+    public void setCliente(Cliente cliente) {
+        this.cliente = cliente;
+    }
+
+    public Ejecutivo getEjecutivo() {
+        return ejecutivo;
+    }
+
+    public void setEjecutivo(Ejecutivo ejecutivo) {
+        this.ejecutivo = ejecutivo;
+    }
+
+    public Empresa getEmpresa() {
+        return empresa;
+    }
+
+    public void setEmpresa(Empresa empresa) {
+        this.empresa = empresa;
+    }
+
+    public TipoPorta getTipoPorta() {
+        return tipoPorta;
+    }
+
+    public void setTipoPorta(TipoPorta tipoPorta) {
+        this.tipoPorta = tipoPorta;
+    }
+
+    public String getTrimestre() {
+        return trimestre;
+    }
+
+    public void setTrimestre(String trimestre) {
+        this.trimestre = trimestre;
+    }
+
+    public LocalDate getFechaAsignacion() {
+        return fechaAsignacion;
+    }
+
+    public void setFechaAsignacion(LocalDate fechaAsignacion) {
+        this.fechaAsignacion = fechaAsignacion;
+    }
+
+    public String getLinkTrello() {
+        return linkTrello;
+    }
+
+    public void setLinkTrello(String linkTrello) {
+        this.linkTrello = linkTrello;
+    }
 }

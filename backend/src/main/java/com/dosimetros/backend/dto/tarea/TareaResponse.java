@@ -1,27 +1,22 @@
-package com.dosimetros.backend.entity;
-
-import jakarta.persistence.*;
+package com.dosimetros.backend.dto.tarea;
 
 import java.time.LocalDate;
 
-@Entity
-@Table(name = "tarea")
-public class Tarea {
+public class TareaResponse {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-
-    @Column(name = "numero_tarea", nullable = false, length = 100)
     private String numeroTarea;
-
-    @Column(name = "fecha_creacion", nullable = false)
     private LocalDate fechaCreacion;
-
-    @Column(length = 500)
     private String observacion;
 
-    public Tarea() {
+    public TareaResponse() {
+    }
+
+    public TareaResponse(Integer id, String numeroTarea, LocalDate fechaCreacion, String observacion) {
+        this.id = id;
+        this.numeroTarea = numeroTarea;
+        this.fechaCreacion = fechaCreacion;
+        this.observacion = observacion;
     }
 
     public Integer getId() {
