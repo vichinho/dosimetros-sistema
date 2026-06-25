@@ -1,19 +1,16 @@
-package com.dosimetros.backend.entity;
+package com.dosimetros.backend.dto.tipodosimetro;
 
-import jakarta.persistence.*;
+public class TipoDosimetroResponse {
 
-@Entity
-@Table(name = "tipo_dosimetro")
-public class TipoDosimetro {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-
-    @Column(nullable = false, unique = true, length = 50)
     private String nombre;
 
-    public TipoDosimetro() {
+    public TipoDosimetroResponse() {
+    }
+
+    public TipoDosimetroResponse(Integer id, String nombre) {
+        this.id = id;
+        this.nombre = nombre;
     }
 
     public Integer getId() {

@@ -1,14 +1,9 @@
 package com.dosimetros.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @Table(name = "tipo_porta")
-@Getter @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class TipoPorta {
 
     @Id
@@ -21,4 +16,31 @@ public class TipoPorta {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "tipo_dosimetro_id", nullable = false)
     private TipoDosimetro tipoDosimetro;
+
+    public TipoPorta() {
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+
+    public TipoDosimetro getTipoDosimetro() {
+        return tipoDosimetro;
+    }
+
+    public void setTipoDosimetro(TipoDosimetro tipoDosimetro) {
+        this.tipoDosimetro = tipoDosimetro;
+    }
 }
