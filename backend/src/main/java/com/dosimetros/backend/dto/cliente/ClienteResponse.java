@@ -1,0 +1,51 @@
+package com.dosimetros.backend.dto.cliente;
+
+public class ClienteResponse {
+
+    private Integer id;
+    private String razonSocial;
+    private String nombreCorto;
+    private Boolean activo;
+
+    public ClienteResponse() {
+    }
+
+    public ClienteResponse(Integer id, String razonSocial, String nombreCorto, Boolean activo) {
+        this.id = id;
+        this.razonSocial = razonSocial;
+        this.nombreCorto = nombreCorto;
+        this.activo = activo;
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getRazonSocial() {
+        return razonSocial;
+    }
+
+    public void setRazonSocial(String razonSocial) {
+        this.razonSocial = razonSocial;
+    }
+
+    public String getNombreCorto() {
+        return nombreCorto;
+    }
+
+    public void setNombreCorto(String nombreCorto) {
+        this.nombreCorto = nombreCorto;
+    }
+
+    public Boolean getActivo() {
+        return activo;
+    }
+
+    public void setActivo(Boolean activo) {
+        this.activo = activo;
+    }
+}
