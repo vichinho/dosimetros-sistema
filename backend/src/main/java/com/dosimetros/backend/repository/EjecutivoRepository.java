@@ -8,6 +8,4 @@ import java.util.List;
 public interface EjecutivoRepository extends JpaRepository<Ejecutivo, Integer> {
 
     List<Ejecutivo> findByActivoTrue();
-
-    List<Ejecutivo> findByEmpresaIdAndActivoTrue(Integer empresaId);
 }

@@ -5,20 +5,15 @@ public class EjecutivoResponse {
     private Integer id;
     private String nombre;
     private String email;
-    private Integer empresaId;
-    private String empresaNombre;
     private Boolean activo;
 
     public EjecutivoResponse() {
     }
 
-    public EjecutivoResponse(Integer id, String nombre, String email,
-                              Integer empresaId, String empresaNombre, Boolean activo) {
+    public EjecutivoResponse(Integer id, String nombre, String email, Boolean activo) {
         this.id = id;
         this.nombre = nombre;
         this.email = email;
-        this.empresaId = empresaId;
-        this.empresaNombre = empresaNombre;
         this.activo = activo;
     }
 
@@ -44,22 +39,6 @@ public class EjecutivoResponse {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public Integer getEmpresaId() {
-        return empresaId;
-    }
-
-    public void setEmpresaId(Integer empresaId) {
-        this.empresaId = empresaId;
-    }
-
-    public String getEmpresaNombre() {
-        return empresaNombre;
-    }
-
-    public void setEmpresaNombre(String empresaNombre) {
-        this.empresaNombre = empresaNombre;
     }
 
     public Boolean getActivo() {

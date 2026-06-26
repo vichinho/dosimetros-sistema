@@ -1,7 +1,6 @@
 package com.dosimetros.backend.dto.ejecutivo;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public class EjecutivoRequest {
@@ -12,9 +11,6 @@ public class EjecutivoRequest {
 
     @Size(max = 200, message = "El email no puede superar 200 caracteres")
     private String email;
-
-    @NotNull(message = "La empresa es obligatoria")
-    private Integer empresaId;
 
     public EjecutivoRequest() {
     }
@@ -33,13 +29,5 @@ public class EjecutivoRequest {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public Integer getEmpresaId() {
-        return empresaId;
-    }
-
-    public void setEmpresaId(Integer empresaId) {
-        this.empresaId = empresaId;
     }
 }

@@ -16,9 +16,6 @@ public class Ejecutivo {
     @Column(length = 200)
     private String email;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "empresa_id", nullable = false)
-    private Empresa empresa;
 
     @Column(nullable = false)
     private Boolean activo = true;
@@ -48,14 +45,6 @@ public class Ejecutivo {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public Empresa getEmpresa() {
-        return empresa;
-    }
-
-    public void setEmpresa(Empresa empresa) {
-        this.empresa = empresa;
     }
 
     public Boolean getActivo() {

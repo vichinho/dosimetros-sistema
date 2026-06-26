@@ -6,7 +6,9 @@ import com.dosimetros.backend.service.EjecutivoService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -24,11 +26,6 @@ public class EjecutivoController {
         return ResponseEntity.ok(ejecutivoService.listarActivos());
     }
 
-    @GetMapping("/empresa/{empresaId}")
-    public ResponseEntity<List<EjecutivoResponse>> listarPorEmpresa(@PathVariable Integer empresaId) {
-        return ResponseEntity.ok(ejecutivoService.listarPorEmpresa(empresaId));
-    }
-
     @GetMapping("/{id}")
     public ResponseEntity<EjecutivoResponse> obtenerPorId(@PathVariable Integer id) {
         return ResponseEntity.ok(ejecutivoService.obtenerPorId(id));
@@ -36,7 +33,15 @@ public class EjecutivoController {
 
     @PostMapping
     public ResponseEntity<EjecutivoResponse> crear(@Valid @RequestBody EjecutivoRequest request) {
-        return ResponseEntity.ok(ejecutivoService.crear(request));
+        EjecutivoResponse response = ejecutivoService.crear(request);
+
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(response.getId())
+                .toUri();
+
+        return ResponseEntity.created(location).body(response);
     }
 
     @PutMapping("/{id}")
