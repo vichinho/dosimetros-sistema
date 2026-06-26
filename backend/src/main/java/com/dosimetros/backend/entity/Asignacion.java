@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "asignacion")
+@Table(name = "ASIGNACION")
 public class Asignacion {
 
     @Id
@@ -42,7 +42,7 @@ public class Asignacion {
     @Column(name = "slot_bandeja")
     private Integer slotBandeja;
 
-    @Column(nullable = false, length = 20)
+    @Column(name = "trimestre", nullable = false, length = 20)
     private String trimestre;
 
     @Column(name = "fecha_asignacion", nullable = false)

@@ -1,5 +1,6 @@
 package com.dosimetros.backend.dto.asignacion;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -22,7 +23,7 @@ public class AsignacionRequest {
     @NotNull(message = "El tipo de porta es obligatorio")
     private Integer tipoPortaId;
 
-    @NotNull(message = "El trimestre es obligatorio")
+    @NotBlank(message = "El trimestre es obligatorio")
     @Size(max = 20, message = "El trimestre no puede superar 20 caracteres")
     private String trimestre;
 

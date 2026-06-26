@@ -1,17 +1,22 @@
 package com.dosimetros.backend.service;
 
+import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
+import com.dosimetros.backend.entity.Asignacion;
 import com.dosimetros.backend.entity.Dosimetro;
 import com.dosimetros.backend.entity.Tarea;
 import com.dosimetros.backend.entity.TipoDosimetro;
 import com.dosimetros.backend.entity.TipoPorta;
 import com.dosimetros.backend.exception.ResourceNotFoundException;
+import com.dosimetros.backend.repository.AsignacionRepository;
 import com.dosimetros.backend.repository.DosimetroRepository;
 import com.dosimetros.backend.repository.TareaRepository;
 import com.dosimetros.backend.repository.TipoDosimetroRepository;
 import com.dosimetros.backend.repository.TipoPortaRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -22,15 +27,18 @@ public class DosimetroService {
     private final TipoDosimetroRepository tipoDosimetroRepository;
     private final TipoPortaRepository tipoPortaRepository;
     private final TareaRepository tareaRepository;
+    private final AsignacionRepository asignacionRepository;
 
     public DosimetroService(DosimetroRepository dosimetroRepository,
                             TipoDosimetroRepository tipoDosimetroRepository,
                             TipoPortaRepository tipoPortaRepository,
-                            TareaRepository tareaRepository) {
+                            TareaRepository tareaRepository,
+                            AsignacionRepository asignacionRepository) {
         this.dosimetroRepository = dosimetroRepository;
         this.tipoDosimetroRepository = tipoDosimetroRepository;
         this.tipoPortaRepository = tipoPortaRepository;
         this.tareaRepository = tareaRepository;
+        this.asignacionRepository = asignacionRepository;
     }
 
     public List<DosimetroResponse> listarDisponibles() {
@@ -50,6 +58,13 @@ public class DosimetroService {
     }
 
     public List<DosimetroResponse> buscarPorNumero(Integer numero) {
+        return dosimetroRepository.findByNumeroOrderByIdAsc(numero)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<DosimetroDetalleResponse> buscarDetallePorNumero(Integer numero) {
         List<Dosimetro> dosimetros = dosimetroRepository.findByNumeroOrderByIdAsc(numero);
 
         if (dosimetros.isEmpty()) {
@@ -57,7 +72,7 @@ public class DosimetroService {
         }
 
         return dosimetros.stream()
-                .map(this::toResponse)
+                .map(this::toDetalleResponse)
                 .toList();
     }
 
@@ -155,6 +170,19 @@ public class DosimetroService {
         return toResponse(dosimetroRepository.save(dosimetro));
     }
 
+    @Transactional
+    public void liberar(Integer id) {
+        Dosimetro dosimetro = dosimetroRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
+
+        if ("baja".equalsIgnoreCase(dosimetro.getEstado())) {
+            throw new IllegalArgumentException("No se puede liberar un dosímetro dado de baja");
+        }
+
+        dosimetro.setEstado("disponible");
+        dosimetroRepository.save(dosimetro);
+    }
+
     public void darDeBaja(Integer id, String observacion) {
         Dosimetro dosimetro = dosimetroRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
@@ -178,6 +206,53 @@ public class DosimetroService {
                 d.getSlotBandeja(),
                 d.getEstado(),
                 d.getObservacion()
+        );
+    }
+
+    private DosimetroDetalleResponse toDetalleResponse(Dosimetro d) {
+        List<AsignacionResponse> asignaciones = asignacionRepository
+                .findByDosimetroIdOrderByFechaAsignacionDesc(d.getId())
+                .stream()
+                .map(this::toAsignacionResponse)
+                .toList();
+
+        return new DosimetroDetalleResponse(
+                d.getId(),
+                d.getNumero(),
+                d.getTipoDosimetro().getId(),
+                d.getTipoDosimetro().getNombre(),
+                d.getTipoPorta() != null ? d.getTipoPorta().getId() : null,
+                d.getTipoPorta() != null ? d.getTipoPorta().getNombre() : null,
+                d.getTarea() != null ? d.getTarea().getId() : null,
+                d.getTarea() != null ? d.getTarea().getNumeroTarea() : null,
+                d.getNumeroBandeja(),
+                d.getSlotBandeja(),
+                d.getEstado(),
+                d.getObservacion(),
+                asignaciones
+        );
+    }
+
+    private AsignacionResponse toAsignacionResponse(Asignacion a) {
+        return new AsignacionResponse(
+                a.getId(),
+                a.getDosimetro().getId(),
+                a.getDosimetro().getNumero(),
+                a.getCliente().getId(),
+                a.getCliente().getRazonSocial(),
+                a.getEjecutivo().getId(),
+                a.getEjecutivo().getNombre(),
+                a.getEmpresa().getId(),
+                a.getEmpresa().getNombre(),
+                a.getTipoPorta().getId(),
+                a.getTipoPorta().getNombre(),
+                a.getTarea() != null ? a.getTarea().getId() : null,
+                a.getTarea() != null ? a.getTarea().getNumeroTarea() : null,
+                a.getNumeroBandeja(),
+                a.getSlotBandeja(),
+                a.getTrimestre(),
+                a.getFechaAsignacion(),
+                a.getLinkTrello()
         );
     }
 }

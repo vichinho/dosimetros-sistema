@@ -16,7 +16,9 @@ import com.dosimetros.backend.repository.EjecutivoRepository;
 import com.dosimetros.backend.repository.EmpresaRepository;
 import com.dosimetros.backend.repository.TipoPortaRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -50,21 +52,36 @@ public class AsignacionService {
                 .toList();
     }
 
+    @Transactional
     public AsignacionResponse crear(AsignacionRequest request) {
         Dosimetro dosimetro = dosimetroRepository.findById(request.getDosimetroId())
-                .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + request.getDosimetroId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Dosímetro no encontrado con id: " + request.getDosimetroId()
+                ));
 
         Cliente cliente = clienteRepository.findById(request.getClienteId())
-                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado con id: " + request.getClienteId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cliente no encontrado con id: " + request.getClienteId()
+                ));
 
         Ejecutivo ejecutivo = ejecutivoRepository.findById(request.getEjecutivoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Ejecutivo no encontrado con id: " + request.getEjecutivoId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Ejecutivo no encontrado con id: " + request.getEjecutivoId()
+                ));
 
         Empresa empresa = empresaRepository.findById(request.getEmpresaId())
-                .orElseThrow(() -> new ResourceNotFoundException("Empresa no encontrada con id: " + request.getEmpresaId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Empresa no encontrada con id: " + request.getEmpresaId()
+                ));
 
         TipoPorta tipoPorta = tipoPortaRepository.findById(request.getTipoPortaId())
-                .orElseThrow(() -> new ResourceNotFoundException("Tipo de porta no encontrado con id: " + request.getTipoPortaId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de porta no encontrado con id: " + request.getTipoPortaId()
+                ));
+
+        if (!"disponible".equalsIgnoreCase(dosimetro.getEstado())) {
+            throw new IllegalArgumentException("El dosímetro no está disponible para asignación");
+        }
 
         if (!tipoPorta.getTipoDosimetro().getId().equals(dosimetro.getTipoDosimetro().getId())) {
             throw new IllegalArgumentException("El tipo de porta no es compatible con el tipo de dosímetro");
@@ -80,13 +97,17 @@ public class AsignacionService {
         asignacion.setNumeroBandeja(dosimetro.getNumeroBandeja());
         asignacion.setSlotBandeja(dosimetro.getSlotBandeja());
         asignacion.setTrimestre(request.getTrimestre());
-        asignacion.setFechaAsignacion(request.getFechaAsignacion());
+        asignacion.setFechaAsignacion(
+                request.getFechaAsignacion() != null ? request.getFechaAsignacion() : LocalDate.now()
+        );
         asignacion.setLinkTrello(request.getLinkTrello());
+
+        Asignacion guardada = asignacionRepository.save(asignacion);
 
         dosimetro.setEstado("asignado");
         dosimetroRepository.save(dosimetro);
 
-        return toResponse(asignacionRepository.save(asignacion));
+        return toResponse(guardada);
     }
 
     private AsignacionResponse toResponse(Asignacion a) {

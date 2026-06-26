@@ -1,6 +1,7 @@
 package com.dosimetros.backend.controller;
 
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.service.AsignacionService;
@@ -8,7 +9,9 @@ import com.dosimetros.backend.service.DosimetroService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -36,8 +39,8 @@ public class DosimetroController {
     }
 
     @GetMapping("/buscar")
-    public ResponseEntity<List<DosimetroResponse>> buscarPorNumero(@RequestParam Integer numero) {
-        return ResponseEntity.ok(service.buscarPorNumero(numero));
+    public ResponseEntity<List<DosimetroDetalleResponse>> buscarPorNumero(@RequestParam Integer numero) {
+        return ResponseEntity.ok(service.buscarDetallePorNumero(numero));
     }
 
     @GetMapping("/{id}")
@@ -52,7 +55,15 @@ public class DosimetroController {
 
     @PostMapping
     public ResponseEntity<DosimetroResponse> crear(@Valid @RequestBody DosimetroRequest request) {
-        return ResponseEntity.ok(service.crear(request));
+        DosimetroResponse response = service.crear(request);
+
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(response.getId())
+                .toUri();
+
+        return ResponseEntity.created(location).body(response);
     }
 
     @PutMapping("/{id}")
@@ -60,6 +71,12 @@ public class DosimetroController {
             @PathVariable Integer id,
             @Valid @RequestBody DosimetroRequest request) {
         return ResponseEntity.ok(service.actualizar(id, request));
+    }
+
+    @PatchMapping("/{id}/liberar")
+    public ResponseEntity<Void> liberar(@PathVariable Integer id) {
+        service.liberar(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/baja")

@@ -6,7 +6,7 @@ public class AsignacionResponse {
 
     private Integer id;
     private Integer dosimetroId;
-    private Integer dosimetroNumero;
+    private Integer numeroDosimetro;
     private Integer clienteId;
     private String clienteNombre;
     private Integer ejecutivoId;
@@ -16,7 +16,7 @@ public class AsignacionResponse {
     private Integer tipoPortaId;
     private String tipoPortaNombre;
     private Integer tareaId;
-    private String tareaNumero;
+    private String numeroTarea;
     private Integer numeroBandeja;
     private Integer slotBandeja;
     private String trimestre;
@@ -26,28 +26,27 @@ public class AsignacionResponse {
     public AsignacionResponse() {
     }
 
-    public AsignacionResponse(
-            Integer id,
-            Integer dosimetroId,
-            Integer dosimetroNumero,
-            Integer clienteId,
-            String clienteNombre,
-            Integer ejecutivoId,
-            String ejecutivoNombre,
-            Integer empresaId,
-            String empresaNombre,
-            Integer tipoPortaId,
-            String tipoPortaNombre,
-            Integer tareaId,
-            String tareaNumero,
-            Integer numeroBandeja,
-            Integer slotBandeja,
-            String trimestre,
-            LocalDate fechaAsignacion,
-            String linkTrello) {
+    public AsignacionResponse(Integer id,
+                              Integer dosimetroId,
+                              Integer numeroDosimetro,
+                              Integer clienteId,
+                              String clienteNombre,
+                              Integer ejecutivoId,
+                              String ejecutivoNombre,
+                              Integer empresaId,
+                              String empresaNombre,
+                              Integer tipoPortaId,
+                              String tipoPortaNombre,
+                              Integer tareaId,
+                              String numeroTarea,
+                              Integer numeroBandeja,
+                              Integer slotBandeja,
+                              String trimestre,
+                              LocalDate fechaAsignacion,
+                              String linkTrello) {
         this.id = id;
         this.dosimetroId = dosimetroId;
-        this.dosimetroNumero = dosimetroNumero;
+        this.numeroDosimetro = numeroDosimetro;
         this.clienteId = clienteId;
         this.clienteNombre = clienteNombre;
         this.ejecutivoId = ejecutivoId;
@@ -57,7 +56,7 @@ public class AsignacionResponse {
         this.tipoPortaId = tipoPortaId;
         this.tipoPortaNombre = tipoPortaNombre;
         this.tareaId = tareaId;
-        this.tareaNumero = tareaNumero;
+        this.numeroTarea = numeroTarea;
         this.numeroBandeja = numeroBandeja;
         this.slotBandeja = slotBandeja;
         this.trimestre = trimestre;
@@ -81,12 +80,12 @@ public class AsignacionResponse {
         this.dosimetroId = dosimetroId;
     }
 
-    public Integer getDosimetroNumero() {
-        return dosimetroNumero;
+    public Integer getNumeroDosimetro() {
+        return numeroDosimetro;
     }
 
-    public void setDosimetroNumero(Integer dosimetroNumero) {
-        this.dosimetroNumero = dosimetroNumero;
+    public void setNumeroDosimetro(Integer numeroDosimetro) {
+        this.numeroDosimetro = numeroDosimetro;
     }
 
     public Integer getClienteId() {
@@ -161,12 +160,12 @@ public class AsignacionResponse {
         this.tareaId = tareaId;
     }
 
-    public String getTareaNumero() {
-        return tareaNumero;
+    public String getNumeroTarea() {
+        return numeroTarea;
     }
 
-    public void setTareaNumero(String tareaNumero) {
-        this.tareaNumero = tareaNumero;
+    public void setNumeroTarea(String numeroTarea) {
+        this.numeroTarea = numeroTarea;
     }
 
     public Integer getNumeroBandeja() {
