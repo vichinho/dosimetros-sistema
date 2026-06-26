@@ -2,9 +2,19 @@ package com.dosimetros.backend.service;
 
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
-import com.dosimetros.backend.entity.*;
+import com.dosimetros.backend.entity.Asignacion;
+import com.dosimetros.backend.entity.Cliente;
+import com.dosimetros.backend.entity.Dosimetro;
+import com.dosimetros.backend.entity.Ejecutivo;
+import com.dosimetros.backend.entity.Empresa;
+import com.dosimetros.backend.entity.TipoPorta;
 import com.dosimetros.backend.exception.ResourceNotFoundException;
-import com.dosimetros.backend.repository.*;
+import com.dosimetros.backend.repository.AsignacionRepository;
+import com.dosimetros.backend.repository.ClienteRepository;
+import com.dosimetros.backend.repository.DosimetroRepository;
+import com.dosimetros.backend.repository.EjecutivoRepository;
+import com.dosimetros.backend.repository.EmpresaRepository;
+import com.dosimetros.backend.repository.TipoPortaRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -66,6 +76,9 @@ public class AsignacionService {
         asignacion.setEjecutivo(ejecutivo);
         asignacion.setEmpresa(empresa);
         asignacion.setTipoPorta(tipoPorta);
+        asignacion.setTarea(dosimetro.getTarea());
+        asignacion.setNumeroBandeja(dosimetro.getNumeroBandeja());
+        asignacion.setSlotBandeja(dosimetro.getSlotBandeja());
         asignacion.setTrimestre(request.getTrimestre());
         asignacion.setFechaAsignacion(request.getFechaAsignacion());
         asignacion.setLinkTrello(request.getLinkTrello());
@@ -89,6 +102,10 @@ public class AsignacionService {
                 a.getEmpresa().getNombre(),
                 a.getTipoPorta().getId(),
                 a.getTipoPorta().getNombre(),
+                a.getTarea() != null ? a.getTarea().getId() : null,
+                a.getTarea() != null ? a.getTarea().getNumeroTarea() : null,
+                a.getNumeroBandeja(),
+                a.getSlotBandeja(),
                 a.getTrimestre(),
                 a.getFechaAsignacion(),
                 a.getLinkTrello()

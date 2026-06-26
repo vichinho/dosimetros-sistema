@@ -32,6 +32,16 @@ public class Asignacion {
     @JoinColumn(name = "tipo_porta_id", nullable = false)
     private TipoPorta tipoPorta;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tarea_id")
+    private Tarea tarea;
+
+    @Column(name = "numero_bandeja")
+    private Integer numeroBandeja;
+
+    @Column(name = "slot_bandeja")
+    private Integer slotBandeja;
+
     @Column(nullable = false, length = 20)
     private String trimestre;
 
@@ -90,6 +100,30 @@ public class Asignacion {
 
     public void setTipoPorta(TipoPorta tipoPorta) {
         this.tipoPorta = tipoPorta;
+    }
+
+    public Tarea getTarea() {
+        return tarea;
+    }
+
+    public void setTarea(Tarea tarea) {
+        this.tarea = tarea;
+    }
+
+    public Integer getNumeroBandeja() {
+        return numeroBandeja;
+    }
+
+    public void setNumeroBandeja(Integer numeroBandeja) {
+        this.numeroBandeja = numeroBandeja;
+    }
+
+    public Integer getSlotBandeja() {
+        return slotBandeja;
+    }
+
+    public void setSlotBandeja(Integer slotBandeja) {
+        this.slotBandeja = slotBandeja;
     }
 
     public String getTrimestre() {
