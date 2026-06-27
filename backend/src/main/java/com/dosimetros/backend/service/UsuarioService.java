@@ -9,7 +9,7 @@ import com.dosimetros.backend.exception.ResourceNotFoundException;
 import com.dosimetros.backend.repository.EjecutivoRepository;
 import com.dosimetros.backend.repository.RolRepository;
 import com.dosimetros.backend.repository.UsuarioRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,12 +20,12 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final RolRepository rolRepository;
     private final EjecutivoRepository ejecutivoRepository;
-    private final BCryptPasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
     public UsuarioService(UsuarioRepository usuarioRepository,
                           RolRepository rolRepository,
                           EjecutivoRepository ejecutivoRepository,
-                          BCryptPasswordEncoder passwordEncoder) {
+                          PasswordEncoder passwordEncoder) {
         this.usuarioRepository = usuarioRepository;
         this.rolRepository = rolRepository;
         this.ejecutivoRepository = ejecutivoRepository;
