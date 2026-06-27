@@ -8,6 +8,7 @@ import com.dosimetros.backend.service.AsignacionService;
 import com.dosimetros.backend.service.DosimetroService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -27,11 +28,13 @@ public class DosimetroController {
     }
 
     @GetMapping("/disponibles")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<DosimetroResponse>> listarDisponibles() {
         return ResponseEntity.ok(service.listarDisponibles());
     }
 
     @GetMapping("/stock")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<DosimetroResponse>> filtrarStock(
             @RequestParam(required = false) Integer tipoDosimetroId,
             @RequestParam(required = false) String estado) {
@@ -39,34 +42,37 @@ public class DosimetroController {
     }
 
     @GetMapping("/buscar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<DosimetroDetalleResponse>> buscarPorNumero(@RequestParam Integer numero) {
         return ResponseEntity.ok(service.buscarDetallePorNumero(numero));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<DosimetroResponse> obtener(@PathVariable Integer id) {
         return ResponseEntity.ok(service.obtenerPorId(id));
     }
 
     @GetMapping("/{id}/historial")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<AsignacionResponse>> historial(@PathVariable Integer id) {
         return ResponseEntity.ok(asignacionService.listarPorDosimetro(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DosimetroResponse> crear(@Valid @RequestBody DosimetroRequest request) {
         DosimetroResponse response = service.crear(request);
-
         URI location = ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
                 .buildAndExpand(response.getId())
                 .toUri();
-
         return ResponseEntity.created(location).body(response);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DosimetroResponse> actualizar(
             @PathVariable Integer id,
             @Valid @RequestBody DosimetroRequest request) {
@@ -74,12 +80,14 @@ public class DosimetroController {
     }
 
     @PatchMapping("/{id}/liberar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<Void> liberar(@PathVariable Integer id) {
         service.liberar(id);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/baja")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> darDeBaja(
             @PathVariable Integer id,
             @RequestParam(required = false) String observacion) {

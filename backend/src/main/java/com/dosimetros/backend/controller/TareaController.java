@@ -5,6 +5,7 @@ import com.dosimetros.backend.dto.tarea.TareaResponse;
 import com.dosimetros.backend.service.TareaService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,36 +14,35 @@ import java.util.List;
 @RequestMapping("/api/tareas")
 public class TareaController {
 
-    private final TareaService service;
+    private final TareaService tareaService;
 
-    public TareaController(TareaService service) {
-        this.service = service;
+    public TareaController(TareaService tareaService) {
+        this.tareaService = tareaService;
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<TareaResponse>> listar() {
-        return ResponseEntity.ok(service.listar());
+        return ResponseEntity.ok(tareaService.listar());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TareaResponse> obtener(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.obtenerPorId(id));
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<TareaResponse> obtenerPorId(@PathVariable Integer id) {
+        return ResponseEntity.ok(tareaService.obtenerPorId(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<TareaResponse> crear(@Valid @RequestBody TareaRequest request) {
-        return ResponseEntity.ok(service.crear(request));
+        return ResponseEntity.ok(tareaService.crear(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TareaResponse> actualizar(@PathVariable Integer id,
-                                                     @Valid @RequestBody TareaRequest request) {
-        return ResponseEntity.ok(service.actualizar(id, request));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
-        service.eliminar(id);
-        return ResponseEntity.noContent().build();
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<TareaResponse> actualizar(
+            @PathVariable Integer id,
+            @Valid @RequestBody TareaRequest request) {
+        return ResponseEntity.ok(tareaService.actualizar(id, request));
     }
 }

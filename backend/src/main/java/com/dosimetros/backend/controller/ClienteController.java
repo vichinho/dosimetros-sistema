@@ -5,6 +5,7 @@ import com.dosimetros.backend.dto.cliente.ClienteResponse;
 import com.dosimetros.backend.service.ClienteService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,22 +20,27 @@ public class ClienteController {
         this.clienteService = clienteService;
     }
 
+    // EJECUTIVO solo puede ver, no modificar
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR', 'EJECUTIVO')")
     public ResponseEntity<List<ClienteResponse>> listarActivos() {
         return ResponseEntity.ok(clienteService.listarActivos());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR', 'EJECUTIVO')")
     public ResponseEntity<ClienteResponse> obtenerPorId(@PathVariable Integer id) {
         return ResponseEntity.ok(clienteService.obtenerPorId(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<ClienteResponse> crear(@Valid @RequestBody ClienteRequest request) {
         return ResponseEntity.ok(clienteService.crear(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<ClienteResponse> actualizar(
             @PathVariable Integer id,
             @Valid @RequestBody ClienteRequest request) {
@@ -42,6 +48,7 @@ public class ClienteController {
     }
 
     @PatchMapping("/{id}/desactivar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<Void> desactivar(@PathVariable Integer id) {
         clienteService.desactivar(id);
         return ResponseEntity.noContent().build();

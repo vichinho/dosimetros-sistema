@@ -5,6 +5,7 @@ import com.dosimetros.backend.dto.tipoporta.TipoPortaResponse;
 import com.dosimetros.backend.service.TipoPortaService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,41 +14,48 @@ import java.util.List;
 @RequestMapping("/api/tipos-porta")
 public class TipoPortaController {
 
-    private final TipoPortaService service;
+    private final TipoPortaService tipoPortaService;
 
-    public TipoPortaController(TipoPortaService service) {
-        this.service = service;
+    public TipoPortaController(TipoPortaService tipoPortaService) {
+        this.tipoPortaService = tipoPortaService;
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<TipoPortaResponse>> listar() {
-        return ResponseEntity.ok(service.listar());
+        return ResponseEntity.ok(tipoPortaService.listar());
     }
 
-    @GetMapping("/tipo-dosimetro/{tipoDosimetroId}")
+    @GetMapping("/por-tipo-dosimetro/{tipoDosimetroId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<TipoPortaResponse>> listarPorTipoDosimetro(@PathVariable Integer tipoDosimetroId) {
-        return ResponseEntity.ok(service.listarPorTipoDosimetro(tipoDosimetroId));
+        return ResponseEntity.ok(tipoPortaService.listarPorTipoDosimetro(tipoDosimetroId));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TipoPortaResponse> obtener(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.obtenerPorId(id));
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<TipoPortaResponse> obtenerPorId(@PathVariable Integer id) {
+        return ResponseEntity.ok(tipoPortaService.obtenerPorId(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TipoPortaResponse> crear(@Valid @RequestBody TipoPortaRequest request) {
-        return ResponseEntity.ok(service.crear(request));
+        return ResponseEntity.ok(tipoPortaService.crear(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TipoPortaResponse> actualizar(@PathVariable Integer id,
-                                                         @Valid @RequestBody TipoPortaRequest request) {
-        return ResponseEntity.ok(service.actualizar(id, request));
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<TipoPortaResponse> actualizar(
+            @PathVariable Integer id,
+            @Valid @RequestBody TipoPortaRequest request) {
+        return ResponseEntity.ok(tipoPortaService.actualizar(id, request));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
-        service.eliminar(id);
+        tipoPortaService.eliminar(id);
         return ResponseEntity.noContent().build();
     }
 }

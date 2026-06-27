@@ -5,10 +5,9 @@ import com.dosimetros.backend.dto.ejecutivo.EjecutivoResponse;
 import com.dosimetros.backend.service.EjecutivoService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -22,29 +21,25 @@ public class EjecutivoController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<EjecutivoResponse>> listarActivos() {
         return ResponseEntity.ok(ejecutivoService.listarActivos());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<EjecutivoResponse> obtenerPorId(@PathVariable Integer id) {
         return ResponseEntity.ok(ejecutivoService.obtenerPorId(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<EjecutivoResponse> crear(@Valid @RequestBody EjecutivoRequest request) {
-        EjecutivoResponse response = ejecutivoService.crear(request);
-
-        URI location = ServletUriComponentsBuilder
-                .fromCurrentRequest()
-                .path("/{id}")
-                .buildAndExpand(response.getId())
-                .toUri();
-
-        return ResponseEntity.created(location).body(response);
+        return ResponseEntity.ok(ejecutivoService.crear(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<EjecutivoResponse> actualizar(
             @PathVariable Integer id,
             @Valid @RequestBody EjecutivoRequest request) {
@@ -52,6 +47,7 @@ public class EjecutivoController {
     }
 
     @PatchMapping("/{id}/desactivar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<Void> desactivar(@PathVariable Integer id) {
         ejecutivoService.desactivar(id);
         return ResponseEntity.noContent().build();

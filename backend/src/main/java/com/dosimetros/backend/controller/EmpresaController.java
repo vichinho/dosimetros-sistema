@@ -1,8 +1,9 @@
 package com.dosimetros.backend.controller;
 
-import com.dosimetros.backend.entity.Empresa;
+import com.dosimetros.backend.dto.empresa.EmpresaResponse;
 import com.dosimetros.backend.service.EmpresaService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,14 +12,15 @@ import java.util.List;
 @RequestMapping("/api/empresas")
 public class EmpresaController {
 
-    private final EmpresaService service;
+    private final EmpresaService empresaService;
 
-    public EmpresaController(EmpresaService service) {
-        this.service = service;
+    public EmpresaController(EmpresaService empresaService) {
+        this.empresaService = empresaService;
     }
 
     @GetMapping
-    public ResponseEntity<List<Empresa>> listar() {
-        return ResponseEntity.ok(service.listarActivas());
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR', 'EJECUTIVO')")
+    public ResponseEntity<List<EmpresaResponse>> listar() {
+        return ResponseEntity.ok(empresaService.listar());
     }
 }
