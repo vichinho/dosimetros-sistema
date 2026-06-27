@@ -1,6 +1,6 @@
 package com.dosimetros.backend.config;
 
-import com.dosimetros.backend.security.JwtAuthFilter;
+import com.dosimetros.backend.security.JwtAuthenticationFilter;
 import com.dosimetros.backend.security.UserDetailsServiceImpl;
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
@@ -13,7 +13,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -25,19 +24,15 @@ import org.springframework.security.web.util.matcher.DispatcherTypeRequestMatche
 public class SecurityConfig {
 
     @Bean
-    public UserDetailsService userDetailsService(UserDetailsServiceImpl impl) {
-        return impl;
-    }
-
-    @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider(
-            UserDetailsService userDetailsService,
+            UserDetailsServiceImpl userDetailsService,
             PasswordEncoder passwordEncoder) {
+
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
@@ -51,7 +46,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
-            JwtAuthFilter jwtAuthFilter,
+            JwtAuthenticationFilter jwtAuthenticationFilter,
             DaoAuthenticationProvider provider) throws Exception {
 
         http
@@ -63,12 +58,12 @@ public class SecurityConfig {
                 .requestMatchers(new DispatcherTypeRequestMatcher(DispatcherType.ERROR)).permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/test/public").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
-    
 }

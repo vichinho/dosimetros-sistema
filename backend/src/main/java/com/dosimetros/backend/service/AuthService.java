@@ -25,19 +25,22 @@ public class AuthService {
     }
 
     public LoginResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
+        var authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getUsername(),
                         request.getPassword()
                 )
         );
 
-        Usuario usuario = usuarioRepository.findByUsername(request.getUsername())
+        var principal = (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
+        String username = principal.getUsername();
+
+        Usuario usuario = usuarioRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         String rol = usuario.getRol().getNombre();
-        String token = jwtUtil.generateToken(usuario.getUsername(), rol);
+        String token = jwtUtil.generateToken(username, rol);
 
-        return new LoginResponse(token, usuario.getUsername(), rol);
+        return new LoginResponse(token, username, rol);
     }
 }

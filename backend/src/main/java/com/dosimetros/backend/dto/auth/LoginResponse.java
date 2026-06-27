@@ -3,6 +3,7 @@ package com.dosimetros.backend.dto.auth;
 public class LoginResponse {
 
     private String token;
+    private String type;
     private String username;
     private String rol;
 
@@ -11,6 +12,7 @@ public class LoginResponse {
 
     public LoginResponse(String token, String username, String rol) {
         this.token = token;
+        this.type = "Bearer";
         this.username = username;
         this.rol = rol;
     }
@@ -21,6 +23,14 @@ public class LoginResponse {
 
     public void setToken(String token) {
         this.token = token;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 
     public String getUsername() {

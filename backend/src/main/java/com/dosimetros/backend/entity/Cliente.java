@@ -1,14 +1,9 @@
 package com.dosimetros.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @Table(name = "cliente")
-@Getter @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Cliente {
 
     @Id
@@ -22,6 +17,40 @@ public class Cliente {
     private String nombreCorto;
 
     @Column(nullable = false)
-    @Builder.Default
     private Boolean activo = true;
+
+    public Cliente() {
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getRazonSocial() {
+        return razonSocial;
+    }
+
+    public void setRazonSocial(String razonSocial) {
+        this.razonSocial = razonSocial;
+    }
+
+    public String getNombreCorto() {
+        return nombreCorto;
+    }
+
+    public void setNombreCorto(String nombreCorto) {
+        this.nombreCorto = nombreCorto;
+    }
+
+    public Boolean getActivo() {
+        return activo;
+    }
+
+    public void setActivo(Boolean activo) {
+        this.activo = activo;
+    }
 }
