@@ -33,4 +33,20 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
             @Param("tipoDosimetroId") Integer tipoDosimetroId,
             @Param("estado") String estado
     );
+
+    @Query("""
+        SELECT d FROM Dosimetro d
+        WHERE d.tarea.id = :tareaId
+          AND d.numeroBandeja >= :bandejaDesde
+          AND d.numeroBandeja <= :bandejaHasta
+          AND (:slotDesde IS NULL OR d.slotBandeja >= :slotDesde)
+          AND (:slotHasta IS NULL OR d.slotBandeja <= :slotHasta)
+    """)
+    List<Dosimetro> findByTareaYRangoBandejaSlot(
+            @Param("tareaId") Integer tareaId,
+            @Param("bandejaDesde") Integer bandejaDesde,
+            @Param("bandejaHasta") Integer bandejaHasta,
+            @Param("slotDesde") Integer slotDesde,
+            @Param("slotHasta") Integer slotHasta
+    );
 }

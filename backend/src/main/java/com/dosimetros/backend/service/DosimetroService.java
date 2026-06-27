@@ -1,6 +1,8 @@
 package com.dosimetros.backend.service;
 
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoRequest;
+import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
@@ -50,7 +52,6 @@ public class DosimetroService {
 
     public List<DosimetroResponse> filtrarStock(Integer tipoDosimetroId, String estado) {
         String estadoFinal = (estado == null || estado.isBlank()) ? "disponible" : estado;
-
         return dosimetroRepository.filtrar(tipoDosimetroId, estadoFinal)
                 .stream()
                 .map(this::toResponse)
@@ -66,14 +67,10 @@ public class DosimetroService {
 
     public List<DosimetroDetalleResponse> buscarDetallePorNumero(Integer numero) {
         List<Dosimetro> dosimetros = dosimetroRepository.findByNumeroOrderByIdAsc(numero);
-
         if (dosimetros.isEmpty()) {
             throw new ResourceNotFoundException("No se encontraron dosímetros con número: " + numero);
         }
-
-        return dosimetros.stream()
-                .map(this::toDetalleResponse)
-                .toList();
+        return dosimetros.stream().map(this::toDetalleResponse).toList();
     }
 
     public DosimetroResponse obtenerPorId(Integer id) {
@@ -85,32 +82,10 @@ public class DosimetroService {
     public DosimetroResponse crear(DosimetroRequest request) {
         TipoDosimetro tipoDosimetro = tipoDosimetroRepository.findById(request.getTipoDosimetroId())
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Tipo de dosímetro no encontrado con id: " + request.getTipoDosimetroId()
-                ));
+                        "Tipo de dosímetro no encontrado con id: " + request.getTipoDosimetroId()));
 
-        TipoPorta tipoPorta = null;
-        if (request.getTipoPortaId() != null) {
-            tipoPorta = tipoPortaRepository.findById(request.getTipoPortaId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Tipo de porta no encontrado con id: " + request.getTipoPortaId()
-                    ));
-
-            if (!tipoPorta.getTipoDosimetro().getId().equals(tipoDosimetro.getId())) {
-                throw new IllegalArgumentException("El tipo de porta no es compatible con el tipo de dosímetro");
-            }
-        }
-
-        Tarea tarea = null;
-        if ("OSL".equalsIgnoreCase(tipoDosimetro.getNombre())) {
-            request.setTareaId(null);
-            request.setNumeroBandeja(null);
-            request.setSlotBandeja(null);
-        } else if (request.getTareaId() != null) {
-            tarea = tareaRepository.findById(request.getTareaId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Tarea no encontrada con id: " + request.getTareaId()
-                    ));
-        }
+        TipoPorta tipoPorta = resolverTipoPorta(request.getTipoPortaId(), tipoDosimetro);
+        Tarea tarea = resolverTarea(request, tipoDosimetro);
 
         Dosimetro dosimetro = new Dosimetro();
         dosimetro.setNumero(request.getNumero());
@@ -131,32 +106,10 @@ public class DosimetroService {
 
         TipoDosimetro tipoDosimetro = tipoDosimetroRepository.findById(request.getTipoDosimetroId())
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Tipo de dosímetro no encontrado con id: " + request.getTipoDosimetroId()
-                ));
+                        "Tipo de dosímetro no encontrado con id: " + request.getTipoDosimetroId()));
 
-        TipoPorta tipoPorta = null;
-        if (request.getTipoPortaId() != null) {
-            tipoPorta = tipoPortaRepository.findById(request.getTipoPortaId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Tipo de porta no encontrado con id: " + request.getTipoPortaId()
-                    ));
-
-            if (!tipoPorta.getTipoDosimetro().getId().equals(tipoDosimetro.getId())) {
-                throw new IllegalArgumentException("El tipo de porta no es compatible con el tipo de dosímetro");
-            }
-        }
-
-        Tarea tarea = null;
-        if ("OSL".equalsIgnoreCase(tipoDosimetro.getNombre())) {
-            request.setTareaId(null);
-            request.setNumeroBandeja(null);
-            request.setSlotBandeja(null);
-        } else if (request.getTareaId() != null) {
-            tarea = tareaRepository.findById(request.getTareaId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Tarea no encontrada con id: " + request.getTareaId()
-                    ));
-        }
+        TipoPorta tipoPorta = resolverTipoPorta(request.getTipoPortaId(), tipoDosimetro);
+        Tarea tarea = resolverTarea(request, tipoDosimetro);
 
         dosimetro.setNumero(request.getNumero());
         dosimetro.setTipoDosimetro(tipoDosimetro);
@@ -174,11 +127,9 @@ public class DosimetroService {
     public void liberar(Integer id) {
         Dosimetro dosimetro = dosimetroRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
-
         if ("baja".equalsIgnoreCase(dosimetro.getEstado())) {
             throw new IllegalArgumentException("No se puede liberar un dosímetro dado de baja");
         }
-
         dosimetro.setEstado("disponible");
         dosimetroRepository.save(dosimetro);
     }
@@ -186,10 +137,78 @@ public class DosimetroService {
     public void darDeBaja(Integer id, String observacion) {
         Dosimetro dosimetro = dosimetroRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
-
         dosimetro.setEstado("baja");
         dosimetro.setObservacion(observacion);
         dosimetroRepository.save(dosimetro);
+    }
+
+    /**
+     * HU #6 — Actualiza el tipo de porta de todos los dosímetros de una tarea
+     * que caigan dentro del rango de bandeja y slot indicados.
+     */
+    @Transactional
+    public ActualizarTipoPortaRangoResponse actualizarTipoPortaPorRango(
+            ActualizarTipoPortaRangoRequest request) {
+
+        if (request.getBandejaDesde() > request.getBandejaHasta()) {
+            throw new IllegalArgumentException("bandejaDesde no puede ser mayor que bandejaHasta");
+        }
+        if (request.getSlotDesde() != null && request.getSlotHasta() != null
+                && request.getSlotDesde() > request.getSlotHasta()) {
+            throw new IllegalArgumentException("slotDesde no puede ser mayor que slotHasta");
+        }
+
+        TipoPorta tipoPorta = tipoPortaRepository.findById(request.getTipoPortaId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de porta no encontrado con id: " + request.getTipoPortaId()));
+
+        List<Dosimetro> dosimetros = dosimetroRepository.findByTareaYRangoBandejaSlot(
+                request.getTareaId(),
+                request.getBandejaDesde(),
+                request.getBandejaHasta(),
+                request.getSlotDesde(),
+                request.getSlotHasta()
+        );
+
+        for (Dosimetro d : dosimetros) {
+            // Validar compatibilidad porta/dosimetro
+            if (!tipoPorta.getTipoDosimetro().getId().equals(d.getTipoDosimetro().getId())) {
+                throw new IllegalArgumentException(
+                        "El tipo de porta '" + tipoPorta.getNombre() +
+                        "' no es compatible con el dosímetro #" + d.getNumero() +
+                        " (tipo: " + d.getTipoDosimetro().getNombre() + ")");
+            }
+            d.setTipoPorta(tipoPorta);
+        }
+
+        dosimetroRepository.saveAll(dosimetros);
+        return new ActualizarTipoPortaRangoResponse(dosimetros.size());
+    }
+
+    // --- helpers privados ---
+
+    private TipoPorta resolverTipoPorta(Integer tipoPortaId, TipoDosimetro tipoDosimetro) {
+        if (tipoPortaId == null) return null;
+        TipoPorta tp = tipoPortaRepository.findById(tipoPortaId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de porta no encontrado con id: " + tipoPortaId));
+        if (!tp.getTipoDosimetro().getId().equals(tipoDosimetro.getId())) {
+            throw new IllegalArgumentException("El tipo de porta no es compatible con el tipo de dosímetro");
+        }
+        return tp;
+    }
+
+    private Tarea resolverTarea(DosimetroRequest request, TipoDosimetro tipoDosimetro) {
+        if ("OSL".equalsIgnoreCase(tipoDosimetro.getNombre())) {
+            request.setTareaId(null);
+            request.setNumeroBandeja(null);
+            request.setSlotBandeja(null);
+            return null;
+        }
+        if (request.getTareaId() == null) return null;
+        return tareaRepository.findById(request.getTareaId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tarea no encontrada con id: " + request.getTareaId()));
     }
 
     private DosimetroResponse toResponse(Dosimetro d) {

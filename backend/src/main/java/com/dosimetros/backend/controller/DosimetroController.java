@@ -1,6 +1,8 @@
 package com.dosimetros.backend.controller;
 
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoRequest;
+import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
@@ -77,6 +79,13 @@ public class DosimetroController {
             @PathVariable Integer id,
             @Valid @RequestBody DosimetroRequest request) {
         return ResponseEntity.ok(service.actualizar(id, request));
+    }
+
+    @PatchMapping("/rango-porta")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<ActualizarTipoPortaRangoResponse> actualizarTipoPortaPorRango(
+            @Valid @RequestBody ActualizarTipoPortaRangoRequest request) {
+        return ResponseEntity.ok(service.actualizarTipoPortaPorRango(request));
     }
 
     @PatchMapping("/{id}/liberar")
