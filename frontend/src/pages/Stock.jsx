@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getStock, getTiposDosimetro, getTiposPorta } from '../api/endpoints'
-import { Card, Select, Alert, Badge } from '../components/ui'
+import { Card, Select, Badge, Loading, EmptyState } from '../components/ui'
+import { useToast } from '../components/Toast'
 
 const estadoColor = { disponible: 'green', asignado: 'blue', baja: 'red' }
 
@@ -9,7 +10,8 @@ export default function Stock() {
   const [portas, setPortas] = useState([])
   const [filtros, setFiltros] = useState({ tipoDosimetroId: '', tipoPortaId: '', estado: 'disponible' })
   const [dosimetros, setDosimetros] = useState([])
-  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const toast = useToast()
 
   useEffect(() => {
     getTiposDosimetro().then(setTipos).catch(() => {})
@@ -21,9 +23,12 @@ export default function Stock() {
     if (filtros.tipoDosimetroId) params.tipoDosimetroId = filtros.tipoDosimetroId
     if (filtros.tipoPortaId) params.tipoPortaId = filtros.tipoPortaId
     if (filtros.estado) params.estado = filtros.estado
+    setLoading(true)
     getStock(params)
       .then(setDosimetros)
-      .catch(() => setError('No se pudo cargar el stock'))
+      .catch(() => toast.error('No se pudo cargar el stock'))
+      .finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtros])
 
   const portasFiltradas = filtros.tipoDosimetroId
@@ -33,7 +38,6 @@ export default function Stock() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-800">Stock de dosímetros</h1>
-      <Alert type="error">{error}</Alert>
 
       <Card>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -73,43 +77,41 @@ export default function Stock() {
       </Card>
 
       <Card title={`Resultados (${dosimetros.length})`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-500 border-b border-slate-200">
-                <th className="py-2">Número</th>
-                <th className="py-2">Tipo</th>
-                <th className="py-2">Porta</th>
-                <th className="py-2">Tarea</th>
-                <th className="py-2">Bandeja/Slot</th>
-                <th className="py-2">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dosimetros.map((d) => (
-                <tr key={d.id} className="border-b border-slate-100">
-                  <td className="py-2 font-medium text-slate-800">{d.numero}</td>
-                  <td className="py-2">{d.tipoDosimetroNombre}</td>
-                  <td className="py-2">{d.tipoPortaNombre || <span className="text-slate-400">—</span>}</td>
-                  <td className="py-2">{d.numeroTarea || <span className="text-slate-400">—</span>}</td>
-                  <td className="py-2">
-                    {d.numeroBandeja != null ? `${d.numeroBandeja} / ${d.slotBandeja}` : '—'}
-                  </td>
-                  <td className="py-2">
-                    <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
-                  </td>
+        {loading ? (
+          <Loading />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  <th className="py-2 font-medium">Número</th>
+                  <th className="py-2 font-medium">Tipo</th>
+                  <th className="py-2 font-medium">Porta</th>
+                  <th className="py-2 font-medium">Tarea</th>
+                  <th className="py-2 font-medium">Bandeja/Slot</th>
+                  <th className="py-2 font-medium">Estado</th>
                 </tr>
-              ))}
-              {dosimetros.length === 0 && (
-                <tr>
-                  <td colSpan="6" className="py-6 text-center text-slate-400">
-                    No hay dosímetros con esos filtros
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {dosimetros.map((d) => (
+                  <tr key={d.id} className="border-b border-slate-100">
+                    <td className="py-2.5 font-medium text-slate-800">{d.numero}</td>
+                    <td className="py-2.5 text-slate-600">{d.tipoDosimetroNombre}</td>
+                    <td className="py-2.5 text-slate-600">{d.tipoPortaNombre || <span className="text-slate-400">—</span>}</td>
+                    <td className="py-2.5 text-slate-600">{d.numeroTarea || <span className="text-slate-400">—</span>}</td>
+                    <td className="py-2.5 text-slate-600">
+                      {d.numeroBandeja != null ? `${d.numeroBandeja} / ${d.slotBandeja}` : '—'}
+                    </td>
+                    <td className="py-2.5">
+                      <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {dosimetros.length === 0 && <EmptyState>No hay dosímetros con esos filtros</EmptyState>}
+          </div>
+        )}
       </Card>
     </div>
   )
