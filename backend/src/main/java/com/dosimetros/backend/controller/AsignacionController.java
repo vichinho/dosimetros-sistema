@@ -1,5 +1,7 @@
 package com.dosimetros.backend.controller;
 
+import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
+import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
 import com.dosimetros.backend.service.AsignacionService;
@@ -38,5 +40,12 @@ public class AsignacionController {
                 .buildAndExpand(response.getId())
                 .toUri();
         return ResponseEntity.created(location).body(response);
+    }
+
+    @PostMapping("/masivo")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<AsignacionMasivaResponse> asignarMasivo(
+            @Valid @RequestBody AsignacionMasivaRequest request) {
+        return ResponseEntity.status(201).body(service.asignarMasivo(request));
     }
 }

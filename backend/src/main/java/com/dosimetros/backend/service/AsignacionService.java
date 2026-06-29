@@ -1,5 +1,7 @@
 package com.dosimetros.backend.service;
 
+import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
+import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
 import com.dosimetros.backend.entity.Asignacion;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -108,6 +111,79 @@ public class AsignacionService {
         dosimetroRepository.save(dosimetro);
 
         return toResponse(guardada);
+    }
+
+    @Transactional
+    public AsignacionMasivaResponse asignarMasivo(AsignacionMasivaRequest request) {
+        Cliente cliente = clienteRepository.findById(request.getClienteId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cliente no encontrado con id: " + request.getClienteId()
+                ));
+
+        Ejecutivo ejecutivo = ejecutivoRepository.findById(request.getEjecutivoId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Ejecutivo no encontrado con id: " + request.getEjecutivoId()
+                ));
+
+        Empresa empresa = empresaRepository.findById(request.getEmpresaId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Empresa no encontrada con id: " + request.getEmpresaId()
+                ));
+
+        TipoPorta tipoPorta = tipoPortaRepository.findById(request.getTipoPortaId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de porta no encontrado con id: " + request.getTipoPortaId()
+                ));
+
+        // Solo se eligen dosímetros disponibles dentro de las tareas seleccionadas
+        // cuyo tipo de dosímetro sea compatible con el tipo de porta solicitado.
+        List<Dosimetro> compatibles = dosimetroRepository.findDisponiblesCompatiblesEnTareas(
+                request.getTareaIds(),
+                tipoPorta.getTipoDosimetro().getId()
+        );
+
+        if (compatibles.size() < request.getCantidad()) {
+            throw new IllegalArgumentException(
+                    "Stock insuficiente: se solicitaron " + request.getCantidad()
+                            + " dosímetros compatibles pero solo hay " + compatibles.size()
+                            + " disponibles en las tareas seleccionadas"
+            );
+        }
+
+        LocalDate fecha = request.getFechaAsignacion() != null
+                ? request.getFechaAsignacion()
+                : LocalDate.now();
+
+        List<Dosimetro> seleccionados = compatibles.subList(0, request.getCantidad());
+        List<AsignacionResponse> asignaciones = new ArrayList<>(seleccionados.size());
+
+        for (Dosimetro dosimetro : seleccionados) {
+            Asignacion asignacion = new Asignacion();
+            asignacion.setDosimetro(dosimetro);
+            asignacion.setCliente(cliente);
+            asignacion.setEjecutivo(ejecutivo);
+            asignacion.setEmpresa(empresa);
+            asignacion.setTipoPorta(tipoPorta);
+            asignacion.setTarea(dosimetro.getTarea());
+            asignacion.setNumeroBandeja(dosimetro.getNumeroBandeja());
+            asignacion.setSlotBandeja(dosimetro.getSlotBandeja());
+            asignacion.setTrimestre(request.getTrimestre());
+            asignacion.setFechaAsignacion(fecha);
+            asignacion.setLinkTrello(request.getLinkTrello());
+
+            Asignacion guardada = asignacionRepository.save(asignacion);
+
+            dosimetro.setEstado("asignado");
+            dosimetroRepository.save(dosimetro);
+
+            asignaciones.add(toResponse(guardada));
+        }
+
+        return new AsignacionMasivaResponse(
+                request.getCantidad(),
+                asignaciones.size(),
+                asignaciones
+        );
     }
 
     private AsignacionResponse toResponse(Asignacion a) {
