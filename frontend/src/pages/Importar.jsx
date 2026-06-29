@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import client from '../api/client'
 import { Card, Button, Alert } from '../components/ui'
+import { useToast } from '../components/Toast'
 
 export default function Importar() {
   const [file, setFile] = useState(null)
   const [resultado, setResultado] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const toast = useToast()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -22,8 +24,11 @@ export default function Importar() {
     try {
       const { data } = await client.post('/dosimetros/importacion/excel', formData)
       setResultado(data)
+      toast.success(`Importación completada: ${data.exitosas} exitosas, ${data.fallidas} fallidas`)
     } catch (err) {
-      setError(err.response?.data?.message || 'No se pudo importar el archivo')
+      const msg = err.response?.data?.message || 'No se pudo importar el archivo'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

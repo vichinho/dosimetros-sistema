@@ -8,6 +8,7 @@ import {
   getTareas,
 } from '../api/endpoints'
 import { Card, Button, Input, Select, Alert } from '../components/ui'
+import { useToast } from '../components/Toast'
 
 export default function Asignar() {
   const [clientes, setClientes] = useState([])
@@ -29,6 +30,7 @@ export default function Asignar() {
   const [resultado, setResultado] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const toast = useToast()
 
   useEffect(() => {
     getClientes().then(setClientes).catch(() => {})
@@ -67,8 +69,11 @@ export default function Asignar() {
         linkTrello: form.linkTrello || null,
       })
       setResultado(data)
+      toast.success(`${data.cantidadAsignada} dosímetros asignados`)
     } catch (err) {
-      setError(err.response?.data?.message || 'No se pudo realizar la asignación')
+      const msg = err.response?.data?.message || 'No se pudo realizar la asignación'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

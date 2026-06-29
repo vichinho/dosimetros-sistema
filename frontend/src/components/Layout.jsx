@@ -1,23 +1,37 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import {
+  IconDashboard,
+  IconStock,
+  IconAssign,
+  IconSearch,
+  IconClients,
+  IconUser,
+  IconCopy,
+  IconUpload,
+  IconBox,
+  IconMenu,
+  IconLogout,
+} from './icons'
 
-// Define qué ítems del menú ve cada rol.
 const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', roles: ['ADMIN'] },
-  { to: '/stock', label: 'Stock', roles: ['ADMIN', 'OPERADOR'] },
-  { to: '/asignar', label: 'Asignar', roles: ['ADMIN', 'OPERADOR'] },
-  { to: '/buscar', label: 'Buscar dosímetro', roles: ['ADMIN', 'OPERADOR'] },
-  { to: '/clientes', label: 'Clientes', roles: ['ADMIN', 'OPERADOR'] },
-  { to: '/ejecutivos', label: 'Ejecutivos', roles: ['ADMIN', 'OPERADOR'] },
-  { to: '/duplicados', label: 'Duplicados', roles: ['ADMIN', 'OPERADOR'] },
-  { to: '/importar', label: 'Importar Excel', roles: ['ADMIN'] },
-  { to: '/mis-dosimetros', label: 'Mis dosímetros', roles: ['EJECUTIVO'] },
-  { to: '/mis-clientes', label: 'Mis clientes', roles: ['EJECUTIVO'] },
+  { to: '/', label: 'Dashboard', icon: IconDashboard, roles: ['ADMIN'] },
+  { to: '/stock', label: 'Stock', icon: IconStock, roles: ['ADMIN', 'OPERADOR'] },
+  { to: '/asignar', label: 'Asignar', icon: IconAssign, roles: ['ADMIN', 'OPERADOR'] },
+  { to: '/buscar', label: 'Buscar dosímetro', icon: IconSearch, roles: ['ADMIN', 'OPERADOR'] },
+  { to: '/clientes', label: 'Clientes', icon: IconClients, roles: ['ADMIN', 'OPERADOR'] },
+  { to: '/ejecutivos', label: 'Ejecutivos', icon: IconUser, roles: ['ADMIN', 'OPERADOR'] },
+  { to: '/duplicados', label: 'Duplicados', icon: IconCopy, roles: ['ADMIN', 'OPERADOR'] },
+  { to: '/importar', label: 'Importar Excel', icon: IconUpload, roles: ['ADMIN'] },
+  { to: '/mis-dosimetros', label: 'Mis dosímetros', icon: IconBox, roles: ['EJECUTIVO'] },
+  { to: '/mis-clientes', label: 'Mis clientes', icon: IconClients, roles: ['EJECUTIVO'] },
 ]
 
 export default function Layout() {
   const { username, rol, logout } = useAuth()
   const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -26,44 +40,84 @@ export default function Layout() {
 
   const items = NAV_ITEMS.filter((item) => item.roles.includes(rol))
 
-  return (
-    <div className="min-h-full flex">
-      <aside className="w-60 bg-slate-900 text-slate-200 flex flex-col">
-        <div className="px-5 py-5 border-b border-slate-700">
-          <h1 className="text-lg font-bold text-white">Dosímetros</h1>
-          <p className="text-xs text-slate-400 mt-1">Gestión de stock</p>
+  const sidebar = (
+    <div className="h-full flex flex-col">
+      <div className="px-5 py-5 flex items-center gap-2.5">
+        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white">
+          <IconBox />
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {items.map((item) => (
+        <div>
+          <h1 className="text-sm font-bold text-white leading-tight">Dosímetros</h1>
+          <p className="text-[11px] text-slate-400">Gestión de stock</p>
+        </div>
+      </div>
+      <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
+        {items.map((item) => {
+          const Icon = item.icon
+          return (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
+              onClick={() => setOpen(false)}
               className={({ isActive }) =>
-                `block px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800/70'
                 }`
               }
             >
+              <Icon />
               {item.label}
             </NavLink>
-          ))}
-        </nav>
-        <div className="px-5 py-4 border-t border-slate-700">
-          <p className="text-sm text-white font-medium">{username}</p>
-          <p className="text-xs text-slate-400 mb-3">{rol}</p>
-          <button
-            onClick={handleLogout}
-            className="w-full text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 rounded-lg transition"
-          >
-            Cerrar sesión
-          </button>
+          )
+        })}
+      </nav>
+      <div className="px-3 py-4 border-t border-slate-800">
+        <div className="px-2 mb-3">
+          <p className="text-sm text-white font-medium truncate">{username}</p>
+          <p className="text-[11px] text-slate-400">{rol}</p>
         </div>
-      </aside>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800/70 transition"
+        >
+          <IconLogout />
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  )
 
-      <main className="flex-1 p-8 overflow-auto">
-        <Outlet />
-      </main>
+  return (
+    <div className="min-h-full">
+      {/* Sidebar fijo en escritorio */}
+      <aside className="hidden lg:block fixed inset-y-0 left-0 w-64 bg-slate-900">{sidebar}</aside>
+
+      {/* Drawer móvil */}
+      {open && (
+        <div className="lg:hidden fixed inset-0 z-40">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 w-64 bg-slate-900 shadow-xl">{sidebar}</aside>
+        </div>
+      )}
+
+      <div className="lg:pl-64 flex flex-col min-h-screen">
+        {/* Top bar móvil */}
+        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={() => setOpen(true)}
+            className="text-slate-600 p-1"
+            aria-label="Abrir menú"
+          >
+            <IconMenu width={22} height={22} />
+          </button>
+          <span className="font-semibold text-slate-800">Dosímetros</span>
+        </header>
+
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
