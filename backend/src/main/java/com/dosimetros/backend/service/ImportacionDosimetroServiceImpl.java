@@ -21,25 +21,24 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Columnas esperadas en el Excel (fila 0 = encabezado, datos desde fila 1):
- *   A(0)  = NUMDOSIM       -> dosimetro.numero          (numerico)
- *   B(1)  = TIPO_DOSIMETRO -> tipoDosimetro.nombre      (texto: TLD, OSL, etc.)
- *   C(2)  = TIPO_PORTA     -> tipoPorta.nombre          (texto, opcional)
- *   D(3)  = NUM_BANDEJA    -> dosimetro.numeroBandeja   (numerico, opcional)
- *   E(4)  = SLOT_BANDEJA   -> dosimetro.slotBandeja     (numerico, opcional)
- *   F(5)  = NUM_REPOSITORIO -> tarea.numeroTarea        (texto, opcional)
- *   G(6)  = OBSERVACION    -> dosimetro.observacion     (texto, opcional)
+ * Columnas de la plantilla PLANTILLA_CARGA_MASIVA
+ * (fila 0 = encabezado, datos desde fila 1):
+ *   A(0) = numero_dosimetro -> dosimetro.numero        (numerico, obligatorio)
+ *   B(1) = tipo_dosimetro   -> tipoDosimetro.nombre    (texto: TLD, OSL, Cristal; obligatorio)
+ *   C(2) = tipo_porta       -> tipoPorta.nombre        (texto, opcional)
+ *   D(3) = numero_tarea     -> tarea.numeroTarea       (texto, opcional; vacío para OSL)
+ *   E(4) = numero_bandeja   -> dosimetro.numeroBandeja (numerico, opcional; vacío para OSL)
+ *   F(5) = slot_bandeja     -> dosimetro.slotBandeja   (numerico, opcional; vacío para OSL)
  */
 @Service
 public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroService {
 
-    private static final int COL_NUMDOSIM       = 0;
-    private static final int COL_TIPO_DOSIMETRO = 1;
-    private static final int COL_TIPO_PORTA     = 2;
-    private static final int COL_NUM_BANDEJA    = 3;
-    private static final int COL_SLOT_BANDEJA   = 4;
-    private static final int COL_NUM_REPOSITORIO = 5;
-    private static final int COL_OBSERVACION    = 6;
+    private static final int COL_NUMDOSIM        = 0;
+    private static final int COL_TIPO_DOSIMETRO  = 1;
+    private static final int COL_TIPO_PORTA      = 2;
+    private static final int COL_NUM_REPOSITORIO = 3;
+    private static final int COL_NUM_BANDEJA     = 4;
+    private static final int COL_SLOT_BANDEJA    = 5;
 
     private final DosimetroRepository dosimetroRepository;
     private final TipoDosimetroRepository tipoDosimetroRepository;
@@ -111,38 +110,20 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
                     boolean esOSL = "OSL".equalsIgnoreCase(tipoDosimetro.getNombre());
 
-                    // --- TIPO_PORTA (opcional, ignorado para OSL) ---
+                    // --- TIPO_PORTA (opcional; si viene, debe ser compatible con el tipo) ---
                     TipoPorta tipoPorta = null;
-                    if (!esOSL) {
-                        String tipoPortaNombre = formatter.formatCellValue(row.getCell(COL_TIPO_PORTA)).trim();
-                        if (!tipoPortaNombre.isBlank()) {
-                            tipoPorta = tipoPortaRepository
-                                    .findByNombreAndTipoDosimetroId(tipoPortaNombre, tipoDosimetro.getId())
-                                    .orElseThrow(() -> new IllegalArgumentException(
-                                            "Tipo de porta '" + tipoPortaNombre + "' no compatible con '" + tipoDosimNombre + "'"));
-                        }
+                    String tipoPortaNombre = formatter.formatCellValue(row.getCell(COL_TIPO_PORTA)).trim();
+                    if (!tipoPortaNombre.isBlank()) {
+                        tipoPorta = tipoPortaRepository
+                                .findByNombreAndTipoDosimetroId(tipoPortaNombre, tipoDosimetro.getId())
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                        "Tipo de porta '" + tipoPortaNombre + "' no compatible con '" + tipoDosimNombre + "'"));
                     }
 
-                    // --- NUM_BANDEJA (opcional, ignorado para OSL) ---
-                    Integer numeroBandeja = null;
-                    if (!esOSL) {
-                        String bandStr = formatter.formatCellValue(row.getCell(COL_NUM_BANDEJA)).trim();
-                        if (!bandStr.isBlank()) {
-                            numeroBandeja = (int) Double.parseDouble(bandStr);
-                        }
-                    }
-
-                    // --- SLOT_BANDEJA (opcional, ignorado para OSL) ---
-                    Integer slotBandeja = null;
-                    if (!esOSL) {
-                        String slotStr = formatter.formatCellValue(row.getCell(COL_SLOT_BANDEJA)).trim();
-                        if (!slotStr.isBlank()) {
-                            slotBandeja = (int) Double.parseDouble(slotStr);
-                        }
-                    }
-
-                    // --- NUM_REPOSITORIO / Tarea (opcional, ignorado para OSL) ---
+                    // Los OSL se cargan sin tarea, bandeja ni slot.
                     Tarea tarea = null;
+                    Integer numeroBandeja = null;
+                    Integer slotBandeja = null;
                     if (!esOSL) {
                         String numRepo = formatter.formatCellValue(row.getCell(COL_NUM_REPOSITORIO)).trim();
                         if (!numRepo.isBlank()) {
@@ -154,10 +135,17 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                                         return tareaRepository.save(nueva);
                                     });
                         }
-                    }
 
-                    // --- OBSERVACION (opcional) ---
-                    String observacion = formatter.formatCellValue(row.getCell(COL_OBSERVACION)).trim();
+                        String bandStr = formatter.formatCellValue(row.getCell(COL_NUM_BANDEJA)).trim();
+                        if (!bandStr.isBlank()) {
+                            numeroBandeja = (int) Double.parseDouble(bandStr);
+                        }
+
+                        String slotStr = formatter.formatCellValue(row.getCell(COL_SLOT_BANDEJA)).trim();
+                        if (!slotStr.isBlank()) {
+                            slotBandeja = (int) Double.parseDouble(slotStr);
+                        }
+                    }
 
                     // --- Crear o actualizar dosímetro ---
                     Dosimetro dosimetro = dosimetroRepository
@@ -171,9 +159,6 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                     dosimetro.setNumeroBandeja(numeroBandeja);
                     dosimetro.setSlotBandeja(slotBandeja);
                     dosimetro.setEstado("disponible");
-                    if (!observacion.isBlank()) {
-                        dosimetro.setObservacion(observacion);
-                    }
 
                     dosimetroRepository.save(dosimetro);
                     exitosas++;

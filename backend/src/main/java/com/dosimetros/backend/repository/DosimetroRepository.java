@@ -26,11 +26,13 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
     @Query("""
         SELECT d FROM Dosimetro d
         WHERE (:tipoDosimetroId IS NULL OR d.tipoDosimetro.id = :tipoDosimetroId)
+          AND (:tipoPortaId IS NULL OR d.tipoPorta.id = :tipoPortaId)
           AND (:estado IS NULL OR d.estado = :estado)
         ORDER BY d.numero ASC
     """)
     List<Dosimetro> filtrar(
             @Param("tipoDosimetroId") Integer tipoDosimetroId,
+            @Param("tipoPortaId") Integer tipoPortaId,
             @Param("estado") String estado
     );
 
