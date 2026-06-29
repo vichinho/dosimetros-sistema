@@ -73,4 +73,16 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
         ORDER BY d.numero ASC, d.id ASC
     """)
     List<Dosimetro> findDuplicados();
+
+    // HU #17: KPIs de stock
+    @Query("SELECT d.estado, COUNT(d) FROM Dosimetro d GROUP BY d.estado ORDER BY d.estado")
+    List<Object[]> contarPorEstado();
+
+    @Query("""
+        SELECT t.id, t.nombre, COUNT(d)
+        FROM Dosimetro d JOIN d.tipoDosimetro t
+        GROUP BY t.id, t.nombre
+        ORDER BY t.nombre
+    """)
+    List<Object[]> contarPorTipoDosimetro();
 }
