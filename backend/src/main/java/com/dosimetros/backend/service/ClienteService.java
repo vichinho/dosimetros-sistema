@@ -25,6 +25,14 @@ public class ClienteService {
                 .toList();
     }
 
+    // HU #3: solo los clientes que tienen asignaciones con el ejecutivo logueado.
+    public List<ClienteResponse> listarPorEjecutivo(Integer ejecutivoId) {
+        return clienteRepository.findDistinctClientesByEjecutivoId(ejecutivoId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     public ClienteResponse obtenerPorId(Integer id) {
         Cliente cliente = clienteRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado con id: " + id));

@@ -4,6 +4,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.LoteAsignacionResponse;
 import com.dosimetros.backend.entity.Asignacion;
 import com.dosimetros.backend.entity.Cliente;
 import com.dosimetros.backend.entity.Dosimetro;
@@ -22,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AsignacionService {
@@ -53,6 +56,37 @@ public class AsignacionService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    // HU #3 / #15: dosímetros asignados a los clientes del ejecutivo logueado.
+    public List<AsignacionResponse> listarPorEjecutivo(Integer ejecutivoId) {
+        return asignacionRepository
+                .findByEjecutivoIdOrderByTrimestreDescFechaAsignacionDesc(ejecutivoId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // HU #15: asignaciones del ejecutivo agrupadas por trimestre y fecha (lotes enviados).
+    public List<LoteAsignacionResponse> listarLotesPorEjecutivo(Integer ejecutivoId) {
+        List<AsignacionResponse> asignaciones = listarPorEjecutivo(ejecutivoId);
+
+        Map<String, LoteAsignacionResponse> lotes = new LinkedHashMap<>();
+        for (AsignacionResponse a : asignaciones) {
+            String clave = a.getTrimestre() + "|" + a.getFechaAsignacion();
+            LoteAsignacionResponse lote = lotes.computeIfAbsent(clave, k ->
+                    new LoteAsignacionResponse(
+                            a.getTrimestre(),
+                            a.getFechaAsignacion(),
+                            0,
+                            new ArrayList<>()
+                    ));
+            lote.getAsignaciones().add(a);
+        }
+
+        List<LoteAsignacionResponse> resultado = new ArrayList<>(lotes.values());
+        resultado.forEach(lote -> lote.setCantidad(lote.getAsignaciones().size()));
+        return resultado;
     }
 
     @Transactional
