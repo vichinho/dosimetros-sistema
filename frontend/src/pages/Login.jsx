@@ -36,7 +36,7 @@ export default function Login() {
         className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 w-full max-w-sm space-y-5"
       >
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-800">Sistema de Dosímetros</h1>
+          <h1 className="text-2xl font-bold text-ink">Sistema de Dosímetros</h1>
           <p className="text-sm text-slate-500 mt-1">Inicia sesión para continuar</p>
         </div>
 

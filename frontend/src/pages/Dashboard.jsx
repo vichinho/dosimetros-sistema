@@ -15,9 +15,9 @@ import { getKpis } from '../api/endpoints'
 import { Card, Loading, Alert, EmptyState } from '../components/ui'
 import { useToast } from '../components/Toast'
 
-const BAR_COLORS = ['#6d8196', '#4a4a4a', '#9aa9b6', '#b8c0c8', '#5c6d7e', '#cbcbcb']
-const AXIS_TICK = { fontSize: 12, fill: '#4a4a4a' }
-const GRID_STROKE = '#e7e6d6'
+const BAR_COLORS = ['#6f8f72', '#f2a65a', '#bfc6c4', '#3a4a3c', '#9bb09d', '#e0b487']
+const AXIS_TICK = { fontSize: 12, fill: '#3a4a3c' }
+const GRID_STROKE = '#d8d2c6'
 
 function StatCard({ label, value, accent }) {
   return (
@@ -32,7 +32,7 @@ function StatCard({ label, value, accent }) {
 const tooltipStyle = {
   contentStyle: {
     borderRadius: 12,
-    border: '1px solid #cbcbcb',
+    border: '1px solid #bfc6c4',
     fontSize: 13,
     boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
   },
@@ -47,7 +47,7 @@ function BarPanel({ title, data, dataKey = 'nombre' }) {
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID_STROKE} />
             <XAxis dataKey={dataKey} tick={AXIS_TICK} tickLine={false} axisLine={false} />
             <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} />
-            <Tooltip {...tooltipStyle} cursor={{ fill: '#f5f4e6' }} />
+            <Tooltip {...tooltipStyle} cursor={{ fill: '#ded8cc' }} />
             <Bar dataKey="cantidad" radius={[6, 6, 0, 0]} maxBarSize={56}>
               {data.map((_, i) => (
                 <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
@@ -87,7 +87,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
         <p className="text-sm text-slate-500 mt-0.5">Resumen general del stock y asignaciones</p>
       </div>
 
@@ -98,7 +98,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Total dosímetros" value={kpis.totalDosimetros} accent="bg-ink" />
             <StatCard label="Disponibles" value={estado('disponible')} accent="bg-steel" />
-            <StatCard label="Asignados" value={estado('asignado')} accent="bg-[#9aa9b6]" />
+            <StatCard label="Asignados" value={estado('asignado')} accent="bg-sun" />
             <StatCard label="Total asignaciones" value={kpis.totalAsignaciones} accent="bg-mist" />
           </div>
 
@@ -116,9 +116,9 @@ export default function Dashboard() {
                   <Line
                     type="monotone"
                     dataKey="cantidad"
-                    stroke="#6d8196"
+                    stroke="#6f8f72"
                     strokeWidth={2.5}
-                    dot={{ r: 4, fill: '#6d8196' }}
+                    dot={{ r: 4, fill: '#6f8f72' }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>

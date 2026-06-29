@@ -81,7 +81,7 @@ export default function Asignar() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <h1 className="text-2xl font-bold text-slate-800">Asignación masiva</h1>
+      <h1 className="text-2xl font-bold text-ink">Asignación masiva</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card title="Datos de la asignación">

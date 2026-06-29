@@ -20,7 +20,7 @@ export default function MisClientes() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800">Mis clientes</h1>
+      <h1 className="text-2xl font-bold text-ink">Mis clientes</h1>
       <Alert type="error">{error}</Alert>
 
       <Card title={`Clientes asignados a mí (${clientes.length})`}>
@@ -34,7 +34,7 @@ export default function MisClientes() {
           <tbody>
             {clientes.map((c) => (
               <tr key={c.id} className="border-b border-slate-100">
-                <td className="py-2 font-medium text-slate-800">{c.razonSocial}</td>
+                <td className="py-2 font-medium text-ink">{c.razonSocial}</td>
                 <td className="py-2">{c.nombreCorto || '—'}</td>
               </tr>
             ))}
