@@ -50,9 +50,11 @@ public class DosimetroService {
                 .toList();
     }
 
-    public List<DosimetroResponse> filtrarStock(Integer tipoDosimetroId, String estado) {
+    // HU #7: stock filtrado por tipo de dosímetro, estado de armado (tipo de
+    // porta, incluida "sin armar") y estado del dosímetro.
+    public List<DosimetroResponse> filtrarStock(Integer tipoDosimetroId, Integer tipoPortaId, String estado) {
         String estadoFinal = (estado == null || estado.isBlank()) ? "disponible" : estado;
-        return dosimetroRepository.filtrar(tipoDosimetroId, estadoFinal)
+        return dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, estadoFinal)
                 .stream()
                 .map(this::toResponse)
                 .toList();

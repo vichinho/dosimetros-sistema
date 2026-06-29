@@ -39,8 +39,9 @@ public class DosimetroController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<DosimetroResponse>> filtrarStock(
             @RequestParam(required = false) Integer tipoDosimetroId,
+            @RequestParam(required = false) Integer tipoPortaId,
             @RequestParam(required = false) String estado) {
-        return ResponseEntity.ok(service.filtrarStock(tipoDosimetroId, estado));
+        return ResponseEntity.ok(service.filtrarStock(tipoDosimetroId, tipoPortaId, estado));
     }
 
     @GetMapping("/buscar")
