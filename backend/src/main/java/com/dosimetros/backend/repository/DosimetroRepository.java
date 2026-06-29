@@ -63,4 +63,14 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
             @Param("tareaIds") List<Integer> tareaIds,
             @Param("tipoDosimetroId") Integer tipoDosimetroId
     );
+
+    // HU #9: dosímetros cuyo número físico se repite (más de un id con el mismo numero)
+    @Query("""
+        SELECT d FROM Dosimetro d
+        WHERE d.numero IN (
+            SELECT d2.numero FROM Dosimetro d2 GROUP BY d2.numero HAVING COUNT(d2) > 1
+        )
+        ORDER BY d.numero ASC, d.id ASC
+    """)
+    List<Dosimetro> findDuplicados();
 }

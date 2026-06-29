@@ -6,6 +6,7 @@ import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
+import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
 import com.dosimetros.backend.entity.Asignacion;
 import com.dosimetros.backend.entity.Dosimetro;
 import com.dosimetros.backend.entity.Tarea;
@@ -20,7 +21,10 @@ import com.dosimetros.backend.repository.TipoPortaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class DosimetroService {
@@ -134,6 +138,26 @@ public class DosimetroService {
         }
         dosimetro.setEstado("disponible");
         dosimetroRepository.save(dosimetro);
+    }
+
+    // HU #9: lista los dosímetros con número repetido, agrupados por número.
+    public List<DuplicadoResponse> listarDuplicados() {
+        Map<Integer, List<DosimetroResponse>> porNumero = new LinkedHashMap<>();
+        for (Dosimetro d : dosimetroRepository.findDuplicados()) {
+            porNumero.computeIfAbsent(d.getNumero(), k -> new ArrayList<>()).add(toResponse(d));
+        }
+        return porNumero.entrySet().stream()
+                .map(e -> new DuplicadoResponse(e.getKey(), e.getValue().size(), e.getValue()))
+                .toList();
+    }
+
+    // HU #9: marca un dosímetro como stock de emergencia en su observación.
+    public DosimetroResponse marcarStockEmergencia(Integer id, String observacion) {
+        Dosimetro dosimetro = dosimetroRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
+        String obs = (observacion == null || observacion.isBlank()) ? "stock emergencia" : observacion;
+        dosimetro.setObservacion(obs);
+        return toResponse(dosimetroRepository.save(dosimetro));
     }
 
     public void darDeBaja(Integer id, String observacion) {
