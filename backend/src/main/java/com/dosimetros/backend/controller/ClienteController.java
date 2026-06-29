@@ -20,15 +20,16 @@ public class ClienteController {
         this.clienteService = clienteService;
     }
 
-    // EJECUTIVO solo puede ver, no modificar
+    // ADMIN/OPERADOR ven todos los clientes. El EJECUTIVO usa /api/ejecutivo/mis-clientes
+    // para ver únicamente los suyos (HU #3).
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR', 'EJECUTIVO')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<ClienteResponse>> listarActivos() {
         return ResponseEntity.ok(clienteService.listarActivos());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR', 'EJECUTIVO')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<ClienteResponse> obtenerPorId(@PathVariable Integer id) {
         return ResponseEntity.ok(clienteService.obtenerPorId(id));
     }
