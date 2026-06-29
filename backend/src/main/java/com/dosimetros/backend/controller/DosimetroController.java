@@ -6,6 +6,7 @@ import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
+import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
 import com.dosimetros.backend.service.AsignacionService;
 import com.dosimetros.backend.service.DosimetroService;
 import jakarta.validation.Valid;
@@ -48,6 +49,12 @@ public class DosimetroController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<DosimetroDetalleResponse>> buscarPorNumero(@RequestParam Integer numero) {
         return ResponseEntity.ok(service.buscarDetallePorNumero(numero));
+    }
+
+    @GetMapping("/duplicados")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<DuplicadoResponse>> duplicados() {
+        return ResponseEntity.ok(service.listarDuplicados());
     }
 
     @GetMapping("/{id}")
@@ -94,6 +101,14 @@ public class DosimetroController {
     public ResponseEntity<Void> liberar(@PathVariable Integer id) {
         service.liberar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/stock-emergencia")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<DosimetroResponse> marcarStockEmergencia(
+            @PathVariable Integer id,
+            @RequestParam(required = false) String observacion) {
+        return ResponseEntity.ok(service.marcarStockEmergencia(id, observacion));
     }
 
     @PatchMapping("/{id}/baja")
