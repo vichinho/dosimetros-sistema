@@ -57,7 +57,7 @@ export default function Duplicados() {
                   </td>
                   {rol === 'ADMIN' && (
                     <td className="py-2 text-right">
-                      <button onClick={() => marcar(d.id)} className="text-blue-600 hover:underline text-sm">
+                      <button onClick={() => marcar(d.id)} className="text-steel hover:underline text-sm">
                         Marcar emergencia
                       </button>
                     </td>

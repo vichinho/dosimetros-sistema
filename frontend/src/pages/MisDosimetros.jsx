@@ -52,7 +52,7 @@ export default function MisDosimetros() {
                     <td className="py-2">{a.tipoPortaNombre}</td>
                     <td className="py-2">
                       {a.linkTrello ? (
-                        <a href={a.linkTrello} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                        <a href={a.linkTrello} target="_blank" rel="noreferrer" className="text-steel hover:underline">
                           Ver
                         </a>
                       ) : (

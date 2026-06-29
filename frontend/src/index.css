@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Paleta del proyecto */
+@theme {
+  --color-ink: #4a4a4a;
+  --color-mist: #cbcbcb;
+  --color-cream: #ffffe3;
+  --color-steel: #6d8196;
+}
+
 html,
 body,
 #root {
@@ -8,8 +16,8 @@ body,
 
 body {
   margin: 0;
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: #ffffe3;
+  color: #4a4a4a;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
   -webkit-font-smoothing: antialiased;
