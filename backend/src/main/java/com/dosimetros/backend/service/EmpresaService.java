@@ -1,5 +1,6 @@
 package com.dosimetros.backend.service;
 
+import com.dosimetros.backend.dto.empresa.EmpresaResponse;
 import com.dosimetros.backend.entity.Empresa;
 import com.dosimetros.backend.repository.EmpresaRepository;
 import org.springframework.stereotype.Service;
@@ -15,7 +16,18 @@ public class EmpresaService {
         this.repository = repository;
     }
 
-    public List<Empresa> listarActivas() {
-        return repository.findByActivaTrue();
+    public List<EmpresaResponse> listar() {
+        return repository.findByActivaTrue()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private EmpresaResponse toResponse(Empresa empresa) {
+        return new EmpresaResponse(
+                empresa.getId(),
+                empresa.getNombre(),
+                empresa.getActiva()
+        );
     }
 }
