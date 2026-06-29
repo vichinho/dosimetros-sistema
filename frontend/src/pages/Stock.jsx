@@ -37,7 +37,7 @@ export default function Stock() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800">Stock de dosímetros</h1>
+      <h1 className="text-2xl font-bold text-ink">Stock de dosímetros</h1>
 
       <Card>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -95,7 +95,7 @@ export default function Stock() {
               <tbody>
                 {dosimetros.map((d) => (
                   <tr key={d.id} className="border-b border-slate-100">
-                    <td className="py-2.5 font-medium text-slate-800">{d.numero}</td>
+                    <td className="py-2.5 font-medium text-ink">{d.numero}</td>
                     <td className="py-2.5 text-slate-600">{d.tipoDosimetroNombre}</td>
                     <td className="py-2.5 text-slate-600">{d.tipoPortaNombre || <span className="text-slate-400">—</span>}</td>
                     <td className="py-2.5 text-slate-600">{d.numeroTarea || <span className="text-slate-400">—</span>}</td>

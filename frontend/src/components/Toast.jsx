@@ -40,15 +40,15 @@ export function ToastProvider({ children }) {
 
 function ToastItem({ message, type, onClose }) {
   const styles = {
-    success: 'bg-white border-l-4 border-emerald-500 text-slate-800',
-    error: 'bg-white border-l-4 border-red-500 text-slate-800',
-    info: 'bg-white border-l-4 border-blue-500 text-slate-800',
+    success: 'bg-white border-l-4 border-emerald-500 text-ink',
+    error: 'bg-white border-l-4 border-red-500 text-ink',
+    info: 'bg-white border-l-4 border-steel text-ink',
   }
   const icon = { success: '✓', error: '✕', info: 'ℹ' }
   const iconColor = {
     success: 'text-emerald-500',
     error: 'text-red-500',
-    info: 'text-blue-500',
+    info: 'text-steel',
   }
   return (
     <div

@@ -23,7 +23,7 @@ export default function Buscar() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800">Buscar dosímetro</h1>
+      <h1 className="text-2xl font-bold text-ink">Buscar dosímetro</h1>
 
       <Card>
         <form onSubmit={handleBuscar} className="flex gap-3 items-end">

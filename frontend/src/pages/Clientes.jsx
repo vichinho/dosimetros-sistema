@@ -44,7 +44,7 @@ export default function Clientes() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800">Clientes</h1>
+      <h1 className="text-2xl font-bold text-ink">Clientes</h1>
 
       <Card title="Nuevo cliente">
         <form onSubmit={handleCrear} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -80,7 +80,7 @@ export default function Clientes() {
               <tbody>
                 {clientes.map((c) => (
                   <tr key={c.id} className="border-b border-slate-100">
-                    <td className="py-2.5 font-medium text-slate-800">{c.razonSocial}</td>
+                    <td className="py-2.5 font-medium text-ink">{c.razonSocial}</td>
                     <td className="py-2.5 text-slate-600">{c.nombreCorto || '—'}</td>
                     <td className="py-2.5">
                       <Badge color={c.activo ? 'green' : 'red'}>{c.activo ? 'Activo' : 'Inactivo'}</Badge>

@@ -21,7 +21,7 @@ export default function Duplicados() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800">Dosímetros duplicados</h1>
+      <h1 className="text-2xl font-bold text-ink">Dosímetros duplicados</h1>
       <p className="text-sm text-slate-500">
         Números físicos repetidos. El id interno siempre es único; los duplicados pueden marcarse como
         stock de emergencia.
@@ -49,7 +49,7 @@ export default function Duplicados() {
             <tbody>
               {g.dosimetros.map((d) => (
                 <tr key={d.id} className="border-b border-slate-100">
-                  <td className="py-2 font-medium text-slate-800">{d.id}</td>
+                  <td className="py-2 font-medium text-ink">{d.id}</td>
                   <td className="py-2">{d.tipoDosimetroNombre}</td>
                   <td className="py-2">{d.estado}</td>
                   <td className="py-2">

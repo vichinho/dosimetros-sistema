@@ -20,7 +20,7 @@ export default function MisDosimetros() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800">Mis dosímetros (lotes enviados)</h1>
+      <h1 className="text-2xl font-bold text-ink">Mis dosímetros (lotes enviados)</h1>
       <p className="text-sm text-slate-500">Agrupados por trimestre y fecha de asignación.</p>
       <Alert type="error">{error}</Alert>
 
@@ -46,7 +46,7 @@ export default function MisDosimetros() {
               <tbody>
                 {lote.asignaciones.map((a) => (
                   <tr key={a.id} className="border-b border-slate-100">
-                    <td className="py-2 font-medium text-slate-800">{a.numeroDosimetro}</td>
+                    <td className="py-2 font-medium text-ink">{a.numeroDosimetro}</td>
                     <td className="py-2">{a.clienteNombre}</td>
                     <td className="py-2">{a.empresaNombre}</td>
                     <td className="py-2">{a.tipoPortaNombre}</td>

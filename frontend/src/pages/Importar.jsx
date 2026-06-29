@@ -36,7 +36,7 @@ export default function Importar() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <h1 className="text-2xl font-bold text-slate-800">Importar dosímetros (Excel)</h1>
+      <h1 className="text-2xl font-bold text-ink">Importar dosímetros (Excel)</h1>
 
       <Card>
         <form onSubmit={handleSubmit} className="space-y-4">
