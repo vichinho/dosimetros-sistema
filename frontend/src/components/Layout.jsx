@@ -43,12 +43,12 @@ export default function Layout() {
   const sidebar = (
     <div className="h-full flex flex-col">
       <div className="px-5 py-5 flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white">
+        <div className="w-9 h-9 rounded-lg bg-steel flex items-center justify-center text-white">
           <IconBox />
         </div>
         <div>
           <h1 className="text-sm font-bold text-white leading-tight">Dosímetros</h1>
-          <p className="text-[11px] text-slate-400">Gestión de stock</p>
+          <p className="text-[11px] text-white/50">Gestión de stock</p>
         </div>
       </div>
       <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
@@ -62,7 +62,7 @@ export default function Layout() {
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800/70'
+                  isActive ? 'bg-steel text-white' : 'text-white/70 hover:bg-white/10'
                 }`
               }
             >
@@ -72,14 +72,14 @@ export default function Layout() {
           )
         })}
       </nav>
-      <div className="px-3 py-4 border-t border-slate-800">
+      <div className="px-3 py-4 border-t border-white/10">
         <div className="px-2 mb-3">
           <p className="text-sm text-white font-medium truncate">{username}</p>
-          <p className="text-[11px] text-slate-400">{rol}</p>
+          <p className="text-[11px] text-white/50">{rol}</p>
         </div>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800/70 transition"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/70 hover:bg-white/10 transition"
         >
           <IconLogout />
           Cerrar sesión
@@ -91,27 +91,27 @@ export default function Layout() {
   return (
     <div className="min-h-full">
       {/* Sidebar fijo en escritorio */}
-      <aside className="hidden lg:block fixed inset-y-0 left-0 w-64 bg-slate-900">{sidebar}</aside>
+      <aside className="hidden lg:block fixed inset-y-0 left-0 w-64 bg-ink">{sidebar}</aside>
 
       {/* Drawer móvil */}
       {open && (
         <div className="lg:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-64 bg-slate-900 shadow-xl">{sidebar}</aside>
+          <aside className="absolute inset-y-0 left-0 w-64 bg-ink shadow-xl">{sidebar}</aside>
         </div>
       )}
 
       <div className="lg:pl-64 flex flex-col min-h-screen">
         {/* Top bar móvil */}
-        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-mist px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => setOpen(true)}
-            className="text-slate-600 p-1"
+            className="text-ink p-1"
             aria-label="Abrir menú"
           >
             <IconMenu width={22} height={22} />
           </button>
-          <span className="font-semibold text-slate-800">Dosímetros</span>
+          <span className="font-semibold text-ink">Dosímetros</span>
         </header>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
