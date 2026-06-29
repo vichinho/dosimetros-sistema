@@ -49,4 +49,16 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
             @Param("slotDesde") Integer slotDesde,
             @Param("slotHasta") Integer slotHasta
     );
+
+    @Query("""
+        SELECT d FROM Dosimetro d
+        WHERE d.estado = 'disponible'
+          AND d.tarea.id IN :tareaIds
+          AND d.tipoDosimetro.id = :tipoDosimetroId
+        ORDER BY d.tarea.id ASC, d.numeroBandeja ASC, d.slotBandeja ASC
+    """)
+    List<Dosimetro> findDisponiblesCompatiblesEnTareas(
+            @Param("tareaIds") List<Integer> tareaIds,
+            @Param("tipoDosimetroId") Integer tipoDosimetroId
+    );
 }
