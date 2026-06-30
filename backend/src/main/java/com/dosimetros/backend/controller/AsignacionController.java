@@ -30,6 +30,12 @@ public class AsignacionController {
         return ResponseEntity.ok(service.listarPorDosimetro(dosimetroId));
     }
 
+    @GetMapping("/cliente/{clienteId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<AsignacionResponse>> listarPorCliente(@PathVariable Integer clienteId) {
+        return ResponseEntity.ok(service.listarPorCliente(clienteId));
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<AsignacionResponse> crear(@Valid @RequestBody AsignacionRequest request) {

@@ -14,6 +14,8 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>
 
     List<Asignacion> findByEjecutivoIdOrderByTrimestreDescFechaAsignacionDesc(Integer ejecutivoId);
 
+    List<Asignacion> findByClienteIdOrderByFechaAsignacionDesc(Integer clienteId);
+
     // Vista ejecutivo con multifiltros (todos opcionales).
     @Query("""
         SELECT a FROM Asignacion a

@@ -52,6 +52,8 @@ export const crearCliente = (data) => client.post('/clientes', data).then((r) =>
 export const actualizarCliente = (id, data) =>
   client.put(`/clientes/${id}`, data).then((r) => r.data)
 export const desactivarCliente = (id) => client.patch(`/clientes/${id}/desactivar`)
+export const getAsignacionesPorCliente = (clienteId) =>
+  client.get(`/asignaciones/cliente/${clienteId}`).then((r) => r.data)
 
 // --- Ejecutivos ---
 export const getEjecutivos = () => client.get('/ejecutivos').then((r) => r.data)

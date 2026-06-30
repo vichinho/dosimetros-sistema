@@ -69,6 +69,14 @@ public class AsignacionService {
                 .toList();
     }
 
+    // Asignaciones de un cliente (para el detalle del cliente).
+    public List<AsignacionResponse> listarPorCliente(Integer clienteId) {
+        return asignacionRepository.findByClienteIdOrderByFechaAsignacionDesc(clienteId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     // Vista ejecutivo con multifiltros (todos opcionales).
     public List<AsignacionResponse> filtrarPorEjecutivo(
             Integer ejecutivoId, Integer clienteId, String trimestre, java.time.LocalDate fecha,
