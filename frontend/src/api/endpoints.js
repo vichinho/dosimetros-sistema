@@ -11,7 +11,8 @@ export const getTiposPorta = () => client.get('/tipos-porta').then((r) => r.data
 export const getTareas = () => client.get('/tareas').then((r) => r.data)
 
 // --- Dashboard ---
-export const getKpis = () => client.get('/dashboard/kpis').then((r) => r.data)
+export const getKpis = (trimestre) =>
+  client.get('/dashboard/kpis', { params: trimestre ? { trimestre } : {} }).then((r) => r.data)
 
 // --- Dosímetros ---
 export const getStock = (params) =>
