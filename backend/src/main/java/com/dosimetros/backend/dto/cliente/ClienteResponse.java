@@ -6,15 +6,23 @@ public class ClienteResponse {
     private String razonSocial;
     private String nombreCorto;
     private Boolean activo;
+    private Integer ejecutivoId;
+    private String ejecutivoNombre;
+    // True si el cliente no tiene dosímetros vigentes en estado 'asignado' (HU #16).
+    private Boolean pendienteAsignacion;
 
     public ClienteResponse() {
     }
 
-    public ClienteResponse(Integer id, String razonSocial, String nombreCorto, Boolean activo) {
+    public ClienteResponse(Integer id, String razonSocial, String nombreCorto, Boolean activo,
+                           Integer ejecutivoId, String ejecutivoNombre, Boolean pendienteAsignacion) {
         this.id = id;
         this.razonSocial = razonSocial;
         this.nombreCorto = nombreCorto;
         this.activo = activo;
+        this.ejecutivoId = ejecutivoId;
+        this.ejecutivoNombre = ejecutivoNombre;
+        this.pendienteAsignacion = pendienteAsignacion;
     }
 
     public Integer getId() {
@@ -47,5 +55,29 @@ public class ClienteResponse {
 
     public void setActivo(Boolean activo) {
         this.activo = activo;
+    }
+
+    public Integer getEjecutivoId() {
+        return ejecutivoId;
+    }
+
+    public void setEjecutivoId(Integer ejecutivoId) {
+        this.ejecutivoId = ejecutivoId;
+    }
+
+    public String getEjecutivoNombre() {
+        return ejecutivoNombre;
+    }
+
+    public void setEjecutivoNombre(String ejecutivoNombre) {
+        this.ejecutivoNombre = ejecutivoNombre;
+    }
+
+    public Boolean getPendienteAsignacion() {
+        return pendienteAsignacion;
+    }
+
+    public void setPendienteAsignacion(Boolean pendienteAsignacion) {
+        this.pendienteAsignacion = pendienteAsignacion;
     }
 }
