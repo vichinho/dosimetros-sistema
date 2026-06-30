@@ -51,6 +51,8 @@ export const marcarDanado = (id) =>
   client.patch(`/dosimetros/${id}/danado`).then((r) => r.data)
 export const marcarBueno = (id) =>
   client.patch(`/dosimetros/${id}/bueno`).then((r) => r.data)
+export const actualizarTipoPortaRango = (data) =>
+  client.patch('/dosimetros/rango-porta', data).then((r) => r.data)
 
 // --- Clientes ---
 export const getClientes = () => client.get('/clientes').then((r) => r.data)

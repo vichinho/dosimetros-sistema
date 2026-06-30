@@ -18,6 +18,7 @@ import {
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: IconDashboard, roles: ['ADMIN'] },
   { to: '/stock', label: 'Stock', icon: IconStock, roles: ['ADMIN', 'OPERADOR'] },
+  { to: '/armar', label: 'Armar', icon: IconBox, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/asignar', label: 'Asignar', icon: IconAssign, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/buscar', label: 'Buscar dosímetro', icon: IconSearch, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/clientes', label: 'Clientes', icon: IconClients, roles: ['ADMIN', 'OPERADOR'] },

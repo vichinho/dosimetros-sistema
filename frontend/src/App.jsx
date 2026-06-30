@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Stock from './pages/Stock'
 import Asignar from './pages/Asignar'
+import Armar from './pages/Armar'
 import Buscar from './pages/Buscar'
 import Clientes from './pages/Clientes'
 import Ejecutivos from './pages/Ejecutivos'
@@ -40,6 +41,7 @@ export default function App() {
       >
         <Route path="/" element={<Home />} />
         <Route path="/stock" element={<ProtectedRoute roles={OPER}><Stock /></ProtectedRoute>} />
+        <Route path="/armar" element={<ProtectedRoute roles={OPER}><Armar /></ProtectedRoute>} />
         <Route path="/asignar" element={<ProtectedRoute roles={OPER}><Asignar /></ProtectedRoute>} />
         <Route path="/buscar" element={<ProtectedRoute roles={OPER}><Buscar /></ProtectedRoute>} />
         <Route path="/clientes" element={<ProtectedRoute roles={OPER}><Clientes /></ProtectedRoute>} />
