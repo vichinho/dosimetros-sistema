@@ -10,6 +10,8 @@ import {
 import { Card, Button, Input, Select, Alert } from '../components/ui'
 import { useToast } from '../components/Toast'
 
+const TRIMESTRE_REGEX = /^[1-4]T\d{4}$/
+
 export default function Asignar() {
   const [clientes, setClientes] = useState([])
   const [ejecutivos, setEjecutivos] = useState([])
@@ -18,7 +20,7 @@ export default function Asignar() {
   const [tareas, setTareas] = useState([])
 
   const [form, setForm] = useState({
-    clienteId: '',
+    clienteNombre: '',
     ejecutivoId: '',
     empresaId: '',
     tipoPortaId: '',
@@ -42,6 +44,13 @@ export default function Asignar() {
 
   const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value })
 
+  // Trimestre: normaliza a mayúsculas y autocompleta el año si solo escribe "3T".
+  const normalizaTrimestre = (valor) => {
+    let t = valor.toUpperCase().replace(/\s/g, '')
+    if (/^[1-4]T$/.test(t)) t = t + new Date().getFullYear()
+    return t
+  }
+
   const toggleTarea = (id) => {
     setTareasSeleccionadas((prev) =>
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
@@ -52,18 +61,36 @@ export default function Asignar() {
     e.preventDefault()
     setError('')
     setResultado(null)
+
+    // Validar cliente contra la lista
+    const cliente = clientes.find(
+      (c) => c.razonSocial.toLowerCase() === form.clienteNombre.trim().toLowerCase()
+    )
+    if (!cliente) {
+      setError('Selecciona un cliente válido de la lista')
+      return
+    }
+
+    // Validar formato de trimestre (ej. 3T2026)
+    const trimestre = normalizaTrimestre(form.trimestre)
+    if (!TRIMESTRE_REGEX.test(trimestre)) {
+      setError('El trimestre debe tener el formato 1T2026, 2T2026, etc.')
+      return
+    }
+
     if (tareasSeleccionadas.length === 0) {
       setError('Selecciona al menos una tarea')
       return
     }
+
     setLoading(true)
     try {
       const data = await asignarMasivo({
-        clienteId: Number(form.clienteId),
+        clienteId: cliente.id,
         ejecutivoId: Number(form.ejecutivoId),
         empresaId: Number(form.empresaId),
         tipoPortaId: Number(form.tipoPortaId),
-        trimestre: form.trimestre,
+        trimestre,
         cantidad: Number(form.cantidad),
         tareaIds: tareasSeleccionadas,
         linkTrello: form.linkTrello || null,
@@ -86,12 +113,24 @@ export default function Asignar() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card title="Datos de la asignación">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select label="Cliente" value={form.clienteId} onChange={set('clienteId')} required>
-              <option value="">Selecciona…</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>{c.razonSocial}</option>
-              ))}
-            </Select>
+            {/* Cliente: combobox escribible con validación contra la lista */}
+            <label className="block">
+              <span className="block text-sm font-medium text-ink/70 mb-1.5">Cliente</span>
+              <input
+                list="clientes-list"
+                value={form.clienteNombre}
+                onChange={set('clienteNombre')}
+                placeholder="Escribe o selecciona…"
+                className="w-full px-3 py-2 border border-mist rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-steel/40 focus:border-steel transition"
+                required
+              />
+              <datalist id="clientes-list">
+                {clientes.map((c) => (
+                  <option key={c.id} value={c.razonSocial} />
+                ))}
+              </datalist>
+            </label>
+
             <Select label="Ejecutivo" value={form.ejecutivoId} onChange={set('ejecutivoId')} required>
               <option value="">Selecciona…</option>
               {ejecutivos.map((e) => (
@@ -110,7 +149,22 @@ export default function Asignar() {
                 <option key={p.id} value={p.id}>{p.nombre}</option>
               ))}
             </Select>
-            <Input label="Trimestre (ej. 2T2026)" value={form.trimestre} onChange={set('trimestre')} required />
+
+            {/* Trimestre: valida formato y autocompleta el año */}
+            <label className="block">
+              <span className="block text-sm font-medium text-ink/70 mb-1.5">Trimestre</span>
+              <input
+                value={form.trimestre}
+                onChange={set('trimestre')}
+                onBlur={() => setForm((f) => ({ ...f, trimestre: normalizaTrimestre(f.trimestre) }))}
+                placeholder="Ej: 3T  →  3T2026"
+                pattern="[1-4]T[0-9]{4}"
+                title="Formato: 1T2026, 2T2026, etc."
+                className="w-full px-3 py-2 border border-mist rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-steel/40 focus:border-steel transition"
+                required
+              />
+            </label>
+
             <Input
               label="Cantidad"
               type="number"
@@ -138,8 +192,8 @@ export default function Asignar() {
                 key={t.id}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm ${
                   tareasSeleccionadas.includes(t.id)
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-slate-200'
+                    ? 'border-steel bg-steel/10'
+                    : 'border-mist'
                 }`}
               >
                 <input

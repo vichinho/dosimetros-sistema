@@ -41,7 +41,7 @@ export default function MisClientes() {
             <thead>
               <tr className="text-left text-slate-500 border-b border-slate-200">
                 <th className="py-2 font-medium">Razón social</th>
-                <th className="py-2 font-medium">Nombre corto</th>
+                <th className="py-2 font-medium">Nombre fantasía</th>
                 <th className="py-2 font-medium">Estado</th>
               </tr>
             </thead>

@@ -5,5 +5,6 @@ package com.dosimetros.backend.entity;
 public enum EstadoDosimetro {
     disponible,
     asignado,
-    baja
+    baja,
+    dañado
 }

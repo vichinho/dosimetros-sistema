@@ -18,7 +18,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Columnas de la plantilla PLANTILLA_CARGA_MASIVA
@@ -70,6 +72,9 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
         List<String> errores = new ArrayList<>();
         int exitosas = 0;
         int fallidas = 0;
+        int omitidas = 0;
+        // Para detectar números repetidos dentro del mismo archivo.
+        Set<Integer> numerosEnArchivo = new HashSet<>();
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
@@ -97,6 +102,23 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                         numeroDosimetro = (int) Double.parseDouble(numDosimStr);
                     } catch (NumberFormatException e) {
                         throw new IllegalArgumentException("NUMDOSIM no es un número válido: '" + numDosimStr + "'");
+                    }
+
+                    // --- Validación de duplicados ---
+                    // Mismo número repetido dentro del archivo.
+                    if (!numerosEnArchivo.add(numeroDosimetro)) {
+                        omitidas++;
+                        errores.add("Fila " + fila + ": número " + numeroDosimetro
+                                + " repetido dentro del archivo (omitido)");
+                        continue;
+                    }
+                    // Número ya existente en el sistema: no se duplica el dosímetro.
+                    // (La reasignación entre trimestres se maneja por asignaciones.)
+                    if (dosimetroRepository.existsByNumero(numeroDosimetro)) {
+                        omitidas++;
+                        errores.add("Fila " + fila + ": número " + numeroDosimetro
+                                + " ya existe en el sistema (omitido, no se duplica)");
+                        continue;
                     }
 
                     // --- TIPO_DOSIMETRO (obligatorio) ---
@@ -147,10 +169,8 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                         }
                     }
 
-                    // --- Crear o actualizar dosímetro ---
-                    Dosimetro dosimetro = dosimetroRepository
-                            .findByNumeroAndEstado(numeroDosimetro, "disponible")
-                            .orElse(new Dosimetro());
+                    // --- Crear dosímetro (los duplicados ya fueron filtrados) ---
+                    Dosimetro dosimetro = new Dosimetro();
 
                     dosimetro.setNumero(numeroDosimetro);
                     dosimetro.setTipoDosimetro(tipoDosimetro);
@@ -172,6 +192,7 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
             response.setTotalFilas(totalFilas);
             response.setExitosas(exitosas);
             response.setFallidas(fallidas);
+            response.setOmitidas(omitidas);
             response.setErrores(errores);
 
         } catch (IOException e) {

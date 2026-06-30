@@ -30,6 +30,10 @@ export const darDeBaja = (id, observacion) =>
   client.patch(`/dosimetros/${id}/baja`, null, { params: { observacion } }).then((r) => r.data)
 export const liberarDosimetro = (id) =>
   client.patch(`/dosimetros/${id}/liberar`).then((r) => r.data)
+export const marcarDanado = (id) =>
+  client.patch(`/dosimetros/${id}/danado`).then((r) => r.data)
+export const marcarBueno = (id) =>
+  client.patch(`/dosimetros/${id}/bueno`).then((r) => r.data)
 
 // --- Clientes ---
 export const getClientes = () => client.get('/clientes').then((r) => r.data)

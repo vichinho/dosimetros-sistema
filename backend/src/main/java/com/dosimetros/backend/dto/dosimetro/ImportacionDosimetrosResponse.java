@@ -8,9 +8,18 @@ public class ImportacionDosimetrosResponse {
     private int totalFilas;
     private int exitosas;
     private int fallidas;
+    private int omitidas;
     private List<String> errores = new ArrayList<>();
 
     public ImportacionDosimetrosResponse() {
+    }
+
+    public int getOmitidas() {
+        return omitidas;
+    }
+
+    public void setOmitidas(int omitidas) {
+        this.omitidas = omitidas;
     }
 
     public int getTotalFilas() {

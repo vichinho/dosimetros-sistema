@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react'
-import { getStock, getTiposDosimetro, getTiposPorta } from '../api/endpoints'
-import { Card, Select, Badge, Loading, EmptyState } from '../components/ui'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  getStock,
+  getTiposDosimetro,
+  getTiposPorta,
+  marcarDanado,
+  marcarBueno,
+} from '../api/endpoints'
+import { Card, Select, Badge, Button, Loading, EmptyState } from '../components/ui'
 import { useToast } from '../components/Toast'
 
-const estadoColor = { disponible: 'green', asignado: 'blue', baja: 'red' }
+const estadoColor = { disponible: 'green', asignado: 'blue', baja: 'red', dañado: 'amber' }
 
 export default function Stock() {
   const [tipos, setTipos] = useState([])
@@ -18,7 +24,7 @@ export default function Stock() {
     getTiposPorta().then(setPortas).catch(() => {})
   }, [])
 
-  useEffect(() => {
+  const cargar = useCallback(() => {
     const params = {}
     if (filtros.tipoDosimetroId) params.tipoDosimetroId = filtros.tipoDosimetroId
     if (filtros.tipoPortaId) params.tipoPortaId = filtros.tipoPortaId
@@ -28,8 +34,31 @@ export default function Stock() {
       .then(setDosimetros)
       .catch(() => toast.error('No se pudo cargar el stock'))
       .finally(() => setLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtros])
+  }, [filtros, toast])
+
+  useEffect(() => {
+    cargar()
+  }, [cargar])
+
+  const onMarcarDanado = async (id) => {
+    try {
+      await marcarDanado(id)
+      toast.success('Dosímetro marcado como dañado')
+      cargar()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo marcar como dañado')
+    }
+  }
+
+  const onMarcarBueno = async (id) => {
+    try {
+      await marcarBueno(id)
+      toast.success('Dosímetro marcado como bueno (disponible)')
+      cargar()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo marcar como bueno')
+    }
+  }
 
   const portasFiltradas = filtros.tipoDosimetroId
     ? portas.filter((p) => String(p.tipoDosimetroId) === String(filtros.tipoDosimetroId))
@@ -70,6 +99,7 @@ export default function Stock() {
           >
             <option value="disponible">Disponible</option>
             <option value="asignado">Asignado</option>
+            <option value="dañado">Dañado</option>
             <option value="baja">Baja</option>
             <option value="">Todos</option>
           </Select>
@@ -90,6 +120,7 @@ export default function Stock() {
                   <th className="py-2 font-medium">Tarea</th>
                   <th className="py-2 font-medium">Bandeja/Slot</th>
                   <th className="py-2 font-medium">Estado</th>
+                  <th className="py-2 font-medium text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -104,6 +135,24 @@ export default function Stock() {
                     </td>
                     <td className="py-2.5">
                       <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
+                    </td>
+                    <td className="py-2.5 text-right">
+                      {d.estado === 'disponible' && (
+                        <button
+                          onClick={() => onMarcarDanado(d.id)}
+                          className="text-amber-600 hover:underline text-sm"
+                        >
+                          Marcar dañado
+                        </button>
+                      )}
+                      {d.estado === 'dañado' && (
+                        <button
+                          onClick={() => onMarcarBueno(d.id)}
+                          className="text-steel hover:underline text-sm"
+                        >
+                          Marcar bueno
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
