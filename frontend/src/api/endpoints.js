@@ -9,6 +9,12 @@ export const getEmpresas = () => client.get('/empresas').then((r) => r.data)
 export const getTiposDosimetro = () => client.get('/tipos-dosimetro').then((r) => r.data)
 export const getTiposPorta = () => client.get('/tipos-porta').then((r) => r.data)
 export const getTareas = () => client.get('/tareas').then((r) => r.data)
+export const getTareasDisponibles = (tipoDosimetroId) =>
+  client
+    .get('/dosimetros/tareas-disponibles', {
+      params: tipoDosimetroId ? { tipoDosimetroId } : {},
+    })
+    .then((r) => r.data)
 
 // --- Dashboard ---
 export const getKpis = (trimestre) =>

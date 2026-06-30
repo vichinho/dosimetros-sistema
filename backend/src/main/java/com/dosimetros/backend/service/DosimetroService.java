@@ -8,6 +8,7 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
+import com.dosimetros.backend.dto.tarea.TareaDisponibleResponse;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -70,6 +71,13 @@ public class DosimetroService {
         return dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, estadoFinal)
                 .stream()
                 .map(this::toResponse)
+                .toList();
+    }
+
+    // Tareas que tienen al menos un dosímetro disponible (opcional: de un tipo).
+    public List<TareaDisponibleResponse> tareasConDisponibles(Integer tipoDosimetroId) {
+        return dosimetroRepository.tareasConDisponibles(tipoDosimetroId).stream()
+                .map(o -> new TareaDisponibleResponse((Integer) o[0], (String) o[1], (Long) o[2]))
                 .toList();
     }
 

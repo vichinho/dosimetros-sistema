@@ -5,7 +5,7 @@ import {
   getEjecutivos,
   getEmpresas,
   getTiposPorta,
-  getTareas,
+  getTareasDisponibles,
 } from '../api/endpoints'
 import { Card, Button, Input, Select, Alert } from '../components/ui'
 import Combobox from '../components/Combobox'
@@ -40,8 +40,16 @@ export default function Asignar() {
     getEjecutivos().then(setEjecutivos).catch(() => {})
     getEmpresas().then(setEmpresas).catch(() => {})
     getTiposPorta().then(setPortas).catch(() => {})
-    getTareas().then(setTareas).catch(() => {})
   }, [])
+
+  // Solo tareas con dosímetros disponibles, compatibles con el porta elegido.
+  useEffect(() => {
+    const porta = portas.find((p) => String(p.id) === String(form.tipoPortaId))
+    getTareasDisponibles(porta ? porta.tipoDosimetroId : undefined)
+      .then(setTareas)
+      .catch(() => setTareas([]))
+    setTareasSeleccionadas([])
+  }, [form.tipoPortaId, portas])
 
   const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value })
 
@@ -173,27 +181,32 @@ export default function Asignar() {
 
         <Card title="Tareas disponibles">
           <p className="text-sm text-slate-500 mb-3">
-            El sistema elige automáticamente los dosímetros compatibles dentro de las tareas marcadas.
+            Solo se muestran tareas con dosímetros disponibles
+            {form.tipoPortaId ? ' compatibles con el porta elegido' : ''}. El sistema elige
+            automáticamente los dosímetros dentro de las tareas marcadas.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {tareas.map((t) => (
               <label
                 key={t.id}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm ${
-                  tareasSeleccionadas.includes(t.id)
-                    ? 'border-steel bg-steel/10'
-                    : 'border-mist'
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm ${
+                  tareasSeleccionadas.includes(t.id) ? 'border-steel bg-steel/10' : 'border-mist'
                 }`}
               >
-                <input
-                  type="checkbox"
-                  checked={tareasSeleccionadas.includes(t.id)}
-                  onChange={() => toggleTarea(t.id)}
-                />
-                {t.numeroTarea}
+                <span className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={tareasSeleccionadas.includes(t.id)}
+                    onChange={() => toggleTarea(t.id)}
+                  />
+                  {t.numeroTarea}
+                </span>
+                <span className="text-xs text-steel font-medium">{t.disponibles}</span>
               </label>
             ))}
-            {tareas.length === 0 && <p className="text-sm text-slate-400">No hay tareas</p>}
+            {tareas.length === 0 && (
+              <p className="text-sm text-slate-400">No hay tareas con dosímetros disponibles</p>
+            )}
           </div>
         </Card>
 
