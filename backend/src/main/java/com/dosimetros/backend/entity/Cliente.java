@@ -16,10 +16,22 @@ public class Cliente {
     @Column(name = "nombre_corto", length = 200)
     private String nombreCorto;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ejecutivo_id")
+    private Ejecutivo ejecutivo;
+
     @Column(nullable = false)
     private Boolean activo = true;
 
     public Cliente() {
+    }
+
+    public Ejecutivo getEjecutivo() {
+        return ejecutivo;
+    }
+
+    public void setEjecutivo(Ejecutivo ejecutivo) {
+        this.ejecutivo = ejecutivo;
     }
 
     public Integer getId() {

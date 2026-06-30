@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { getClientes, crearCliente, desactivarCliente } from '../api/endpoints'
-import { Card, Button, Input, Badge, Loading, EmptyState } from '../components/ui'
+import { getClientes, crearCliente, desactivarCliente, getEjecutivos } from '../api/endpoints'
+import { Card, Button, Input, Select, Badge, Loading, EmptyState } from '../components/ui'
 import { useToast } from '../components/Toast'
 
 export default function Clientes() {
   const [clientes, setClientes] = useState([])
-  const [form, setForm] = useState({ razonSocial: '', nombreCorto: '' })
+  const [ejecutivos, setEjecutivos] = useState([])
+  const [form, setForm] = useState({ razonSocial: '', nombreCorto: '', ejecutivoId: '' })
   const [loading, setLoading] = useState(true)
   const toast = useToast()
 
@@ -17,14 +18,19 @@ export default function Clientes() {
 
   useEffect(() => {
     cargar()
+    getEjecutivos().then(setEjecutivos).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleCrear = async (e) => {
     e.preventDefault()
     try {
-      await crearCliente({ razonSocial: form.razonSocial, nombreCorto: form.nombreCorto || null })
-      setForm({ razonSocial: '', nombreCorto: '' })
+      await crearCliente({
+        razonSocial: form.razonSocial,
+        nombreCorto: form.nombreCorto || null,
+        ejecutivoId: form.ejecutivoId ? Number(form.ejecutivoId) : null,
+      })
+      setForm({ razonSocial: '', nombreCorto: '', ejecutivoId: '' })
       toast.success('Cliente creado correctamente')
       cargar()
     } catch {
@@ -47,7 +53,7 @@ export default function Clientes() {
       <h1 className="text-2xl font-bold text-ink">Clientes</h1>
 
       <Card title="Nuevo cliente">
-        <form onSubmit={handleCrear} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <form onSubmit={handleCrear} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <Input
             label="Razón social"
             value={form.razonSocial}
@@ -59,6 +65,16 @@ export default function Clientes() {
             value={form.nombreCorto}
             onChange={(e) => setForm({ ...form, nombreCorto: e.target.value })}
           />
+          <Select
+            label="Ejecutivo responsable"
+            value={form.ejecutivoId}
+            onChange={(e) => setForm({ ...form, ejecutivoId: e.target.value })}
+          >
+            <option value="">Sin asignar</option>
+            {ejecutivos.map((ej) => (
+              <option key={ej.id} value={ej.id}>{ej.nombre}</option>
+            ))}
+          </Select>
           <Button type="submit">Crear cliente</Button>
         </form>
       </Card>
@@ -73,7 +89,8 @@ export default function Clientes() {
                 <tr className="text-left text-slate-500 border-b border-slate-200">
                   <th className="py-2 font-medium">Razón social</th>
                   <th className="py-2 font-medium">Nombre corto</th>
-                  <th className="py-2 font-medium">Estado</th>
+                  <th className="py-2 font-medium">Responsable</th>
+                  <th className="py-2 font-medium">Estado asignación</th>
                   <th className="py-2"></th>
                 </tr>
               </thead>
@@ -82,8 +99,13 @@ export default function Clientes() {
                   <tr key={c.id} className="border-b border-slate-100">
                     <td className="py-2.5 font-medium text-ink">{c.razonSocial}</td>
                     <td className="py-2.5 text-slate-600">{c.nombreCorto || '—'}</td>
+                    <td className="py-2.5 text-slate-600">{c.ejecutivoNombre || '—'}</td>
                     <td className="py-2.5">
-                      <Badge color={c.activo ? 'green' : 'red'}>{c.activo ? 'Activo' : 'Inactivo'}</Badge>
+                      {c.pendienteAsignacion ? (
+                        <Badge color="amber">Pendiente de asignación</Badge>
+                      ) : (
+                        <Badge color="green">Con dosímetros</Badge>
+                      )}
                     </td>
                     <td className="py-2.5 text-right">
                       {c.activo && (
@@ -99,7 +121,7 @@ export default function Clientes() {
                 ))}
                 {clientes.length === 0 && (
                   <tr>
-                    <td colSpan="4">
+                    <td colSpan="5">
                       <EmptyState>No hay clientes registrados</EmptyState>
                     </td>
                   </tr>

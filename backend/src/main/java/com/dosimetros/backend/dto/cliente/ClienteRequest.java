@@ -12,7 +12,18 @@ public class ClienteRequest {
     @Size(max = 200, message = "El nombre corto no puede superar 200 caracteres")
     private String nombreCorto;
 
+    // Ejecutivo responsable del cliente (opcional).
+    private Integer ejecutivoId;
+
     public ClienteRequest() {
+    }
+
+    public Integer getEjecutivoId() {
+        return ejecutivoId;
+    }
+
+    public void setEjecutivoId(Integer ejecutivoId) {
+        this.ejecutivoId = ejecutivoId;
     }
 
     public String getRazonSocial() {
