@@ -54,19 +54,25 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
-            config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(",")).map(String::trim).toList());
-        }
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", config);
-        return source;
+    if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+        config.setAllowedOrigins(
+            Arrays.stream(allowedOrigins.split(",")).map(String::trim).toList()
+        );
+    } else {
+        config.setAllowedOriginPatterns(List.of("*")); // fallback dev
     }
+
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowCredentials(true);
+
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", config); // <-- era /api/**, debe ser /**
+    return source;
+}
 
     @Bean
     public SecurityFilterChain filterChain(
