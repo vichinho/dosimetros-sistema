@@ -8,6 +8,8 @@ export const login = (username, password) =>
 export const getRoles = () => client.get('/roles').then((r) => r.data)
 export const getUsuarios = () => client.get('/usuarios').then((r) => r.data)
 export const crearUsuario = (data) => client.post('/usuarios', data).then((r) => r.data)
+export const actualizarUsuario = (id, data) =>
+  client.put(`/usuarios/${id}`, data).then((r) => r.data)
 export const desactivarUsuario = (id) => client.patch(`/usuarios/${id}/desactivar`)
 
 // --- Catálogos ---
