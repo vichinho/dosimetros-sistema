@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -23,7 +24,8 @@ public class DashboardController {
 
     @GetMapping("/kpis")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<DashboardKpisResponse> kpis() {
-        return ResponseEntity.ok(dashboardService.obtenerKpis());
+    public ResponseEntity<DashboardKpisResponse> kpis(
+            @RequestParam(required = false) String trimestre) {
+        return ResponseEntity.ok(dashboardService.obtenerKpis(trimestre));
     }
 }

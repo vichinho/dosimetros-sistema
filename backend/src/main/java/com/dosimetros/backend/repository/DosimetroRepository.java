@@ -96,4 +96,14 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
         ORDER BY t.nombre
     """)
     List<Object[]> contarPorTipoDosimetro();
+
+    // Disponibles para asignar, desglosados por tipo de porta (estado de armado).
+    @Query("""
+        SELECT tp.id, tp.nombre, COUNT(d)
+        FROM Dosimetro d JOIN d.tipoPorta tp
+        WHERE d.estado = 'disponible'
+        GROUP BY tp.id, tp.nombre
+        ORDER BY COUNT(d) DESC
+    """)
+    List<Object[]> contarDisponiblesPorPorta();
 }

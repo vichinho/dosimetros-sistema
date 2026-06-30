@@ -11,6 +11,7 @@ import java.util.List;
 
 /**
  * Calcula los KPIs del dashboard (HU #17) mediante agregaciones en BD.
+ * Las métricas de asignaciones se pueden filtrar por trimestre.
  */
 @Service
 public class DashboardService {
@@ -24,19 +25,42 @@ public class DashboardService {
         this.asignacionRepository = asignacionRepository;
     }
 
-    public DashboardKpisResponse obtenerKpis() {
+    public DashboardKpisResponse obtenerKpis(String trimestre) {
+        String filtro = (trimestre == null || trimestre.isBlank()) ? null : trimestre.trim();
+
         DashboardKpisResponse kpis = new DashboardKpisResponse();
+        kpis.setTrimestre(filtro);
+        kpis.setTrimestresDisponibles(asignacionRepository.trimestresDistinct());
 
+        // --- Stock (estado actual, no depende del trimestre) ---
+        List<ConteoClaveResponse> porEstado = mapearClave(dosimetroRepository.contarPorEstado());
+        kpis.setDosimetrosPorEstado(porEstado);
         kpis.setTotalDosimetros(dosimetroRepository.count());
-        kpis.setTotalAsignaciones(asignacionRepository.count());
-
-        kpis.setDosimetrosPorEstado(mapearClave(dosimetroRepository.contarPorEstado()));
+        kpis.setDisponibles(contarEstado(porEstado, "disponible"));
+        kpis.setAsignados(contarEstado(porEstado, "asignado"));
+        kpis.setDanados(contarEstado(porEstado, "dañado"));
+        kpis.setBaja(contarEstado(porEstado, "baja"));
         kpis.setDosimetrosPorTipo(mapearConteo(dosimetroRepository.contarPorTipoDosimetro()));
-        kpis.setAsignacionesPorEmpresa(mapearConteo(asignacionRepository.contarPorEmpresa()));
-        kpis.setAsignacionesPorEjecutivo(mapearConteo(asignacionRepository.contarPorEjecutivo()));
+        kpis.setDisponiblesPorPorta(mapearConteo(dosimetroRepository.contarDisponiblesPorPorta()));
+
+        // --- Asignaciones (según filtro de trimestre) ---
+        kpis.setTotalAsignaciones(asignacionRepository.contarAsignaciones(filtro));
+        kpis.setAsignacionesPorEmpresa(mapearConteo(asignacionRepository.contarPorEmpresa(filtro)));
+        kpis.setAsignacionesPorEjecutivo(mapearConteo(asignacionRepository.contarPorEjecutivo(filtro)));
+        kpis.setAsignacionesPorTipoPorta(mapearConteo(asignacionRepository.contarPorTipoPorta(filtro)));
+        kpis.setTopClientes(mapearConteo(asignacionRepository.contarPorCliente(filtro)));
+        // La evolución por trimestre siempre muestra todos los trimestres.
         kpis.setAsignacionesPorTrimestre(mapearClave(asignacionRepository.contarPorTrimestre()));
 
         return kpis;
+    }
+
+    private long contarEstado(List<ConteoClaveResponse> porEstado, String estado) {
+        return porEstado.stream()
+                .filter(e -> estado.equalsIgnoreCase(e.getClave()))
+                .map(ConteoClaveResponse::getCantidad)
+                .findFirst()
+                .orElse(0L);
     }
 
     private List<ConteoResponse> mapearConteo(List<Object[]> filas) {
