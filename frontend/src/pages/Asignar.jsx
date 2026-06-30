@@ -8,6 +8,7 @@ import {
   getTareas,
 } from '../api/endpoints'
 import { Card, Button, Input, Select, Alert } from '../components/ui'
+import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 
 const TRIMESTRE_REGEX = /^[1-4]T\d{4}$/
@@ -20,7 +21,7 @@ export default function Asignar() {
   const [tareas, setTareas] = useState([])
 
   const [form, setForm] = useState({
-    clienteNombre: '',
+    clienteId: '',
     ejecutivoId: '',
     empresaId: '',
     tipoPortaId: '',
@@ -62,11 +63,8 @@ export default function Asignar() {
     setError('')
     setResultado(null)
 
-    // Validar cliente contra la lista
-    const cliente = clientes.find(
-      (c) => c.razonSocial.toLowerCase() === form.clienteNombre.trim().toLowerCase()
-    )
-    if (!cliente) {
+    // Validar cliente
+    if (!form.clienteId) {
       setError('Selecciona un cliente válido de la lista')
       return
     }
@@ -86,7 +84,7 @@ export default function Asignar() {
     setLoading(true)
     try {
       const data = await asignarMasivo({
-        clienteId: cliente.id,
+        clienteId: Number(form.clienteId),
         ejecutivoId: Number(form.ejecutivoId),
         empresaId: Number(form.empresaId),
         tipoPortaId: Number(form.tipoPortaId),
@@ -113,23 +111,14 @@ export default function Asignar() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card title="Datos de la asignación">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Cliente: combobox escribible con validación contra la lista */}
-            <label className="block">
-              <span className="block text-sm font-medium text-ink/70 mb-1.5">Cliente</span>
-              <input
-                list="clientes-list"
-                value={form.clienteNombre}
-                onChange={set('clienteNombre')}
-                placeholder="Escribe o selecciona…"
-                className="w-full px-3 py-2 border border-mist rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-steel/40 focus:border-steel transition"
-                required
-              />
-              <datalist id="clientes-list">
-                {clientes.map((c) => (
-                  <option key={c.id} value={c.razonSocial} />
-                ))}
-              </datalist>
-            </label>
+            {/* Cliente: combobox buscable estilizado */}
+            <Combobox
+              label="Cliente"
+              options={clientes.map((c) => ({ value: c.id, label: c.razonSocial }))}
+              value={form.clienteId}
+              onChange={(v) => setForm((f) => ({ ...f, clienteId: v }))}
+              required
+            />
 
             <Select label="Ejecutivo" value={form.ejecutivoId} onChange={set('ejecutivoId')} required>
               <option value="">Selecciona…</option>

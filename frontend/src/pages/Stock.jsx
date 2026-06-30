@@ -8,10 +8,11 @@ import {
   marcarDanado,
   marcarBueno,
 } from '../api/endpoints'
-import { Card, Select, Badge, Button, Loading, EmptyState } from '../components/ui'
+import { Card, Select, Badge, Button, Loading, EmptyState, Pagination } from '../components/ui'
 import { useToast } from '../components/Toast'
 
 const estadoColor = { disponible: 'green', asignado: 'blue', baja: 'red', dañado: 'amber' }
+const POR_PAGINA = 20
 
 export default function Stock() {
   const [tipos, setTipos] = useState([])
@@ -20,6 +21,7 @@ export default function Stock() {
   const [dosimetros, setDosimetros] = useState([])
   const [detallePortas, setDetallePortas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
   const toast = useToast()
 
   useEffect(() => {
@@ -39,7 +41,10 @@ export default function Stock() {
   const cargar = useCallback(() => {
     setLoading(true)
     getStock(construirParams())
-      .then(setDosimetros)
+      .then((data) => {
+        setDosimetros(data)
+        setPage(1)
+      })
       .catch(() => toast.error('No se pudo cargar el stock'))
       .finally(() => setLoading(false))
   }, [construirParams, toast])
@@ -91,6 +96,8 @@ export default function Stock() {
     : portas
 
   const totalDisponibles = detallePortas.reduce((acc, p) => acc + (p.cantidad || 0), 0)
+  const totalPages = Math.ceil(dosimetros.length / POR_PAGINA)
+  const visibles = dosimetros.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
 
   return (
     <div className="space-y-6">
@@ -176,7 +183,7 @@ export default function Stock() {
                 </tr>
               </thead>
               <tbody>
-                {dosimetros.map((d) => (
+                {visibles.map((d) => (
                   <tr key={d.id} className="border-b border-slate-100">
                     <td className="py-2.5 font-medium text-ink">{d.numero}</td>
                     <td className="py-2.5 text-slate-600">{d.tipoDosimetroNombre}</td>
@@ -205,6 +212,7 @@ export default function Stock() {
               </tbody>
             </table>
             {dosimetros.length === 0 && <EmptyState>No hay dosímetros con esos filtros</EmptyState>}
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
           </div>
         )}
       </Card>

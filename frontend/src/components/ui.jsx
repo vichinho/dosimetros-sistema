@@ -104,3 +104,22 @@ export function Loading({ label = 'Cargando…' }) {
 export function EmptyState({ children }) {
   return <div className="py-10 text-center text-sm text-slate-400">{children}</div>
 }
+
+export function Pagination({ page, totalPages, onChange }) {
+  if (totalPages <= 1) return null
+  return (
+    <div className="flex items-center justify-between mt-4 text-sm">
+      <span className="text-slate-500">
+        Página {page} de {totalPages}
+      </span>
+      <div className="flex gap-2">
+        <Button variant="secondary" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+          Anterior
+        </Button>
+        <Button variant="secondary" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
+          Siguiente
+        </Button>
+      </div>
+    </div>
+  )
+}
