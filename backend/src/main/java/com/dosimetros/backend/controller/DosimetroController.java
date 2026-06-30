@@ -7,6 +7,9 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
+import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import com.dosimetros.backend.service.AsignacionService;
 import com.dosimetros.backend.service.DosimetroService;
 import jakarta.validation.Valid;
@@ -55,6 +58,26 @@ public class DosimetroController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<DuplicadoResponse>> duplicados() {
         return ResponseEntity.ok(service.listarDuplicados());
+    }
+
+    @GetMapping("/disponibles/portas")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<PortaDisponibleResponse>> portasDisponibles() {
+        return ResponseEntity.ok(service.detallePortasDisponibles());
+    }
+
+    @GetMapping("/stock/export")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<byte[]> exportarStock(
+            @RequestParam(required = false) Integer tipoDosimetroId,
+            @RequestParam(required = false) Integer tipoPortaId,
+            @RequestParam(required = false) String estado) {
+        byte[] data = service.exportarStockExcel(tipoDosimetroId, tipoPortaId, estado);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"stock.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(data);
     }
 
     @GetMapping("/{id}")
