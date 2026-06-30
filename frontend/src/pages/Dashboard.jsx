@@ -198,7 +198,7 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <BarPanel title={`Asignaciones por ejecutivo${sufijo}`} data={kpis.asignacionesPorEjecutivo} horizontal />
-            <BarPanel title={`Top clientes${sufijo}`} data={(kpis.topClientes || []).slice(0, 8)} horizontal />
+            <BarPanel title={`Top 5 clientes${sufijo}`} data={(kpis.topClientes || []).slice(0, 5)} horizontal />
           </div>
         </>
       )}
