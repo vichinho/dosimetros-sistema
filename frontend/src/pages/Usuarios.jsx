@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   getUsuarios,
   crearUsuario,
+  actualizarUsuario,
   desactivarUsuario,
   getRoles,
   getEjecutivos,
@@ -9,11 +10,14 @@ import {
 import { Card, Button, Input, Select, Badge, Loading, EmptyState } from '../components/ui'
 import { useToast } from '../components/Toast'
 
+const VACIO = { username: '', password: '', rolId: '', ejecutivoId: '' }
+
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([])
   const [roles, setRoles] = useState([])
   const [ejecutivos, setEjecutivos] = useState([])
-  const [form, setForm] = useState({ username: '', password: '', rolId: '', ejecutivoId: '' })
+  const [form, setForm] = useState(VACIO)
+  const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(true)
   const toast = useToast()
 
@@ -33,24 +37,49 @@ export default function Usuarios() {
   const rolSeleccionado = roles.find((r) => String(r.id) === String(form.rolId))
   const esEjecutivo = rolSeleccionado?.nombre === 'EJECUTIVO'
 
-  const handleCrear = async (e) => {
+  const resetForm = () => {
+    setForm(VACIO)
+    setEditId(null)
+  }
+
+  const editar = (u) => {
+    const rol = roles.find((r) => r.nombre === u.rol)
+    setEditId(u.id)
+    setForm({
+      username: u.username,
+      password: '',
+      rolId: rol ? String(rol.id) : '',
+      ejecutivoId: u.ejecutivoId ? String(u.ejecutivoId) : '',
+    })
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (esEjecutivo && !form.ejecutivoId) {
       toast.error('Selecciona el ejecutivo asociado')
       return
     }
     try {
-      await crearUsuario({
-        username: form.username.trim(),
-        password: form.password,
-        rolId: Number(form.rolId),
-        ejecutivoId: esEjecutivo && form.ejecutivoId ? Number(form.ejecutivoId) : null,
-      })
-      setForm({ username: '', password: '', rolId: '', ejecutivoId: '' })
-      toast.success('Usuario creado correctamente')
+      if (editId) {
+        await actualizarUsuario(editId, {
+          rolId: Number(form.rolId),
+          ejecutivoId: esEjecutivo && form.ejecutivoId ? Number(form.ejecutivoId) : null,
+          password: form.password ? form.password : null,
+        })
+        toast.success('Usuario actualizado')
+      } else {
+        await crearUsuario({
+          username: form.username.trim(),
+          password: form.password,
+          rolId: Number(form.rolId),
+          ejecutivoId: esEjecutivo && form.ejecutivoId ? Number(form.ejecutivoId) : null,
+        })
+        toast.success('Usuario creado correctamente')
+      }
+      resetForm()
       cargar()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'No se pudo crear el usuario')
+      toast.error(err.response?.data?.message || 'No se pudo guardar el usuario')
     }
   }
 
@@ -58,6 +87,7 @@ export default function Usuarios() {
     try {
       await desactivarUsuario(id)
       toast.success('Usuario desactivado')
+      if (editId === id) resetForm()
       cargar()
     } catch {
       toast.error('No se pudo desactivar')
@@ -70,20 +100,22 @@ export default function Usuarios() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-ink">Usuarios</h1>
 
-      <Card title="Nuevo usuario">
-        <form onSubmit={handleCrear} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+      <Card title={editId ? `Editar usuario: ${form.username}` : 'Nuevo usuario'}>
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
           <Input
             label="Usuario"
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
             required
+            disabled={!!editId}
           />
           <Input
-            label="Contraseña"
+            label={editId ? 'Nueva contraseña (opcional)' : 'Contraseña'}
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
+            required={!editId}
+            placeholder={editId ? 'Dejar vacío para mantener' : ''}
           />
           <Select
             label="Rol"
@@ -107,7 +139,14 @@ export default function Usuarios() {
               <option key={ej.id} value={ej.id}>{ej.nombre}</option>
             ))}
           </Select>
-          <Button type="submit">Crear usuario</Button>
+          <div className="flex gap-2">
+            <Button type="submit">{editId ? 'Guardar' : 'Crear usuario'}</Button>
+            {editId && (
+              <Button type="button" variant="secondary" onClick={resetForm}>
+                Cancelar
+              </Button>
+            )}
+          </div>
         </form>
       </Card>
 
@@ -137,7 +176,10 @@ export default function Usuarios() {
                     <td className="py-2.5">
                       <Badge color={u.activo ? 'green' : 'red'}>{u.activo ? 'Activo' : 'Inactivo'}</Badge>
                     </td>
-                    <td className="py-2.5 text-right">
+                    <td className="py-2.5 text-right space-x-3">
+                      <button onClick={() => editar(u)} className="text-steel hover:underline text-sm">
+                        Editar
+                      </button>
                       {u.activo && (
                         <button
                           onClick={() => handleDesactivar(u.id)}

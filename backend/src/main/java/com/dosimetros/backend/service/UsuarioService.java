@@ -2,6 +2,7 @@ package com.dosimetros.backend.service;
 
 import com.dosimetros.backend.dto.usuario.UsuarioRequest;
 import com.dosimetros.backend.dto.usuario.UsuarioResponse;
+import com.dosimetros.backend.dto.usuario.UsuarioUpdateRequest;
 import com.dosimetros.backend.entity.Ejecutivo;
 import com.dosimetros.backend.entity.Rol;
 import com.dosimetros.backend.entity.Usuario;
@@ -68,6 +69,31 @@ public class UsuarioService {
         usuario.setRol(rol);
         usuario.setEjecutivo(ejecutivo);
         usuario.setActivo(true);
+
+        return toResponse(usuarioRepository.save(usuario));
+    }
+
+    public UsuarioResponse actualizar(Integer id, UsuarioUpdateRequest request) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con id: " + id));
+
+        Rol rol = rolRepository.findById(request.getRolId())
+                .orElseThrow(() -> new ResourceNotFoundException("Rol no encontrado con id: " + request.getRolId()));
+
+        Ejecutivo ejecutivo = null;
+        if ("EJECUTIVO".equals(rol.getNombre())) {
+            if (request.getEjecutivoId() == null) {
+                throw new IllegalArgumentException("El ejecutivoId es obligatorio para usuarios con rol EJECUTIVO");
+            }
+            ejecutivo = ejecutivoRepository.findById(request.getEjecutivoId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Ejecutivo no encontrado con id: " + request.getEjecutivoId()));
+        }
+
+        usuario.setRol(rol);
+        usuario.setEjecutivo(ejecutivo);
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            usuario.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        }
 
         return toResponse(usuarioRepository.save(usuario));
     }

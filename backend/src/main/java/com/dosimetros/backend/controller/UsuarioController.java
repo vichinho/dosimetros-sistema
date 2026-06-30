@@ -2,6 +2,7 @@ package com.dosimetros.backend.controller;
 
 import com.dosimetros.backend.dto.usuario.UsuarioRequest;
 import com.dosimetros.backend.dto.usuario.UsuarioResponse;
+import com.dosimetros.backend.dto.usuario.UsuarioUpdateRequest;
 import com.dosimetros.backend.service.UsuarioService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +37,14 @@ public class UsuarioController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UsuarioResponse> crear(@Valid @RequestBody UsuarioRequest request) {
         return ResponseEntity.ok(usuarioService.crear(request));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UsuarioResponse> actualizar(
+            @PathVariable Integer id,
+            @Valid @RequestBody UsuarioUpdateRequest request) {
+        return ResponseEntity.ok(usuarioService.actualizar(id, request));
     }
 
     @PatchMapping("/{id}/desactivar")
