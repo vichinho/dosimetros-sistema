@@ -8,6 +8,7 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
+import com.dosimetros.backend.dto.tarea.TareaDisponibleResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import com.dosimetros.backend.service.AsignacionService;
@@ -64,6 +65,13 @@ public class DosimetroController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<PortaDisponibleResponse>> portasDisponibles() {
         return ResponseEntity.ok(service.detallePortasDisponibles());
+    }
+
+    @GetMapping("/tareas-disponibles")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<TareaDisponibleResponse>> tareasDisponibles(
+            @RequestParam(required = false) Integer tipoDosimetroId) {
+        return ResponseEntity.ok(service.tareasConDisponibles(tipoDosimetroId));
     }
 
     @GetMapping("/stock/export")
