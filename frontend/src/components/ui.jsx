@@ -105,6 +105,23 @@ export function EmptyState({ children }) {
   return <div className="py-10 text-center text-sm text-slate-400">{children}</div>
 }
 
+export function Modal({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl border border-mist/60 w-full max-w-3xl max-h-[85vh] overflow-auto shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-mist/50 sticky top-0 bg-white">
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
+          <button onClick={onClose} className="text-ink/40 hover:text-ink text-lg leading-none">
+            ✕
+          </button>
+        </div>
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 export function Pagination({ page, totalPages, onChange }) {
   if (totalPages <= 1) return null
   return (
