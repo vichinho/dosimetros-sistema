@@ -3,6 +3,16 @@ import { getEjecutivos, crearEjecutivo, desactivarEjecutivo } from '../api/endpo
 import { Card, Button, Input, Badge, Loading, EmptyState } from '../components/ui'
 import { useToast } from '../components/Toast'
 
+function iniciales(nombre) {
+  return nombre
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase()
+}
+
 export default function Ejecutivos() {
   const [ejecutivos, setEjecutivos] = useState([])
   const [form, setForm] = useState({ nombre: '', email: '' })
@@ -64,52 +74,48 @@ export default function Ejecutivos() {
         </form>
       </Card>
 
-      <Card title={`Ejecutivos activos (${ejecutivos.length})`}>
+      <div>
+        <h2 className="text-base font-semibold text-ink mb-3">
+          Ejecutivos activos ({ejecutivos.length})
+        </h2>
         {loading ? (
           <Loading />
+        ) : ejecutivos.length === 0 ? (
+          <Card>
+            <EmptyState>No hay ejecutivos registrados</EmptyState>
+          </Card>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500 border-b border-slate-200">
-                  <th className="py-2 font-medium">Nombre</th>
-                  <th className="py-2 font-medium">Email</th>
-                  <th className="py-2 font-medium">Estado</th>
-                  <th className="py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {ejecutivos.map((e) => (
-                  <tr key={e.id} className="border-b border-slate-100">
-                    <td className="py-2.5 font-medium text-ink">{e.nombre}</td>
-                    <td className="py-2.5 text-slate-600">{e.email || '—'}</td>
-                    <td className="py-2.5">
-                      <Badge color={e.activo ? 'green' : 'red'}>{e.activo ? 'Activo' : 'Inactivo'}</Badge>
-                    </td>
-                    <td className="py-2.5 text-right">
-                      {e.activo && (
-                        <button
-                          onClick={() => handleDesactivar(e.id)}
-                          className="text-red-600 hover:underline text-sm"
-                        >
-                          Desactivar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {ejecutivos.length === 0 && (
-                  <tr>
-                    <td colSpan="4">
-                      <EmptyState>No hay ejecutivos registrados</EmptyState>
-                    </td>
-                  </tr>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {ejecutivos.map((e) => (
+              <div
+                key={e.id}
+                className="bg-white rounded-2xl border border-mist/60 p-5 flex flex-col gap-4"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-steel/15 text-steel flex items-center justify-center font-bold">
+                    {iniciales(e.nombre)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-ink truncate">{e.nombre}</p>
+                    <p className="text-xs text-ink/50 truncate">{e.email || 'Sin email'}</p>
+                  </div>
+                  <Badge color={e.activo ? 'green' : 'red'}>{e.activo ? 'Activo' : 'Inactivo'}</Badge>
+                </div>
+                {e.activo && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => handleDesactivar(e.id)}
+                      className="text-sm text-red-600 hover:underline"
+                    >
+                      Desactivar
+                    </button>
+                  </div>
                 )}
-              </tbody>
-            </table>
+              </div>
+            ))}
           </div>
         )}
-      </Card>
+      </div>
     </div>
   )
 }
