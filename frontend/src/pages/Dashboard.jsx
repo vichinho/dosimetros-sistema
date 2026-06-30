@@ -18,19 +18,19 @@ import { getKpis } from '../api/endpoints'
 import { Card, Loading, Alert, EmptyState, Select } from '../components/ui'
 import { useToast } from '../components/Toast'
 
-const PALETTE = ['#6f8f72', '#f2a65a', '#bfc6c4', '#3a4a3c', '#9bb09d', '#e0b487', '#8aa0ad', '#c98b54']
+const PALETTE = ['#5b7065', '#304040', '#04202c', '#c9d1c8', '#7d9387', '#9aa79e', '#3f5650', '#b3bdb2']
 const ESTADO_COLOR = {
-  disponible: '#6f8f72',
-  asignado: '#3a4a3c',
-  dañado: '#f2a65a',
-  baja: '#bfc6c4',
+  disponible: '#5b7065',
+  asignado: '#04202c',
+  dañado: '#304040',
+  baja: '#c9d1c8',
 }
-const AXIS_TICK = { fontSize: 12, fill: '#3a4a3c' }
-const GRID_STROKE = '#d8d2c6'
+const AXIS_TICK = { fontSize: 12, fill: '#304040' }
+const GRID_STROKE = '#dfe4dd'
 const tooltipStyle = {
   contentStyle: {
     borderRadius: 12,
-    border: '1px solid #bfc6c4',
+    border: '1px solid #c9d1c8',
     fontSize: 13,
     boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
   },
@@ -62,7 +62,7 @@ function BarPanel({ title, data, dataKey = 'nombre', horizontal = false }) {
             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={GRID_STROKE} />
             <XAxis type="number" allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} />
             <YAxis type="category" dataKey={dataKey} width={140} tick={AXIS_TICK} tickLine={false} axisLine={false} />
-            <Tooltip {...tooltipStyle} cursor={{ fill: '#f5f4e6' }} />
+            <Tooltip {...tooltipStyle} cursor={{ fill: '#e2e6e0' }} />
             <Bar dataKey="cantidad" radius={[0, 6, 6, 0]} maxBarSize={26}>
               {data.map((_, i) => (
                 <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
@@ -74,7 +74,7 @@ function BarPanel({ title, data, dataKey = 'nombre', horizontal = false }) {
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID_STROKE} />
             <XAxis dataKey={dataKey} tick={AXIS_TICK} tickLine={false} axisLine={false} />
             <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} />
-            <Tooltip {...tooltipStyle} cursor={{ fill: '#f5f4e6' }} />
+            <Tooltip {...tooltipStyle} cursor={{ fill: '#e2e6e0' }} />
             <Bar dataKey="cantidad" radius={[6, 6, 0, 0]} maxBarSize={56}>
               {data.map((_, i) => (
                 <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
@@ -139,8 +139,8 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <StatCard label="Total dosímetros" value={kpis.totalDosimetros} accent="bg-ink" />
             <StatCard label="Disponibles para asignar" value={kpis.disponibles} accent="bg-steel" />
-            <StatCard label="Asignados" value={kpis.asignados} accent="bg-[#3a4a3c]" />
-            <StatCard label="Dañados" value={kpis.danados} accent="bg-sun" />
+            <StatCard label="Asignados" value={kpis.asignados} accent="bg-sun" />
+            <StatCard label="Dañados" value={kpis.danados} accent="bg-[#7d9387]" />
             <StatCard label={`Asignaciones${sufijo}`} value={kpis.totalAsignaciones} accent="bg-mist" />
           </div>
 
@@ -179,7 +179,7 @@ export default function Dashboard() {
                     <XAxis dataKey="clave" tick={AXIS_TICK} tickLine={false} axisLine={false} />
                     <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} />
                     <Tooltip {...tooltipStyle} />
-                    <Line type="monotone" dataKey="cantidad" stroke="#6f8f72" strokeWidth={2.5} dot={{ r: 4, fill: '#6f8f72' }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="cantidad" stroke="#5b7065" strokeWidth={2.5} dot={{ r: 4, fill: '#5b7065' }} activeDot={{ r: 6 }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (

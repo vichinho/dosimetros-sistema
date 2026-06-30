@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
-/* Paleta del proyecto (colorhunt: bfc6c4 e8e2d8 6f8f72 f2a65a) */
+/* Paleta del proyecto: 04202C 304040 5B7065 C9D1C8 */
 @theme {
-  --color-ink: #3a4a3c;   /* verde muy oscuro: sidebar y títulos */
-  --color-mist: #bfc6c4;  /* gris verdoso: bordes y neutros */
-  --color-cream: #e8e2d8; /* beige claro: fondo */
-  --color-steel: #6f8f72; /* verde: acento primario */
-  --color-sun: #f2a65a;   /* naranjo: acento secundario */
+  --color-ink: #04202c;   /* más oscuro: sidebar, títulos y texto */
+  --color-sun: #304040;   /* tono intermedio / acento secundario */
+  --color-steel: #5b7065; /* acento primario (botones, nav activo) */
+  --color-mist: #c9d1c8;  /* bordes y neutros */
+  --color-cream: #eef1ec; /* fondo (tinte claro de la paleta) */
 }
 
 html,
@@ -17,8 +17,8 @@ body,
 
 body {
   margin: 0;
-  background-color: #e8e2d8;
-  color: #3a4a3c;
+  background-color: #eef1ec;
+  color: #04202c;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
   -webkit-font-smoothing: antialiased;
