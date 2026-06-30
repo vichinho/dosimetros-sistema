@@ -4,6 +4,12 @@ import client from './client'
 export const login = (username, password) =>
   client.post('/auth/login', { username, password }).then((r) => r.data)
 
+// --- Usuarios ---
+export const getRoles = () => client.get('/roles').then((r) => r.data)
+export const getUsuarios = () => client.get('/usuarios').then((r) => r.data)
+export const crearUsuario = (data) => client.post('/usuarios', data).then((r) => r.data)
+export const desactivarUsuario = (id) => client.patch(`/usuarios/${id}/desactivar`)
+
 // --- Catálogos ---
 export const getEmpresas = () => client.get('/empresas').then((r) => r.data)
 export const getTiposDosimetro = () => client.get('/tipos-dosimetro').then((r) => r.data)

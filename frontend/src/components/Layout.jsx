@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { to: '/ejecutivos', label: 'Ejecutivos', icon: IconUser, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/duplicados', label: 'Duplicados', icon: IconCopy, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/importar', label: 'Importar Excel', icon: IconUpload, roles: ['ADMIN'] },
+  { to: '/usuarios', label: 'Usuarios', icon: IconUser, roles: ['ADMIN'] },
   { to: '/mis-dosimetros', label: 'Mis dosímetros', icon: IconBox, roles: ['EJECUTIVO'] },
   { to: '/mis-asignaciones', label: 'Mis asignaciones', icon: IconAssign, roles: ['EJECUTIVO'] },
   { to: '/mis-clientes', label: 'Mis clientes', icon: IconClients, roles: ['EJECUTIVO'] },

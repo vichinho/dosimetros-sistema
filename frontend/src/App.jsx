@@ -11,6 +11,7 @@ import Clientes from './pages/Clientes'
 import Ejecutivos from './pages/Ejecutivos'
 import Duplicados from './pages/Duplicados'
 import Importar from './pages/Importar'
+import Usuarios from './pages/Usuarios'
 import MisDosimetros from './pages/MisDosimetros'
 import MisAsignaciones from './pages/MisAsignaciones'
 import MisClientes from './pages/MisClientes'
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/ejecutivos" element={<ProtectedRoute roles={OPER}><Ejecutivos /></ProtectedRoute>} />
         <Route path="/duplicados" element={<ProtectedRoute roles={OPER}><Duplicados /></ProtectedRoute>} />
         <Route path="/importar" element={<ProtectedRoute roles={['ADMIN']}><Importar /></ProtectedRoute>} />
+        <Route path="/usuarios" element={<ProtectedRoute roles={['ADMIN']}><Usuarios /></ProtectedRoute>} />
         <Route
           path="/mis-dosimetros"
           element={<ProtectedRoute roles={['EJECUTIVO']}><MisDosimetros /></ProtectedRoute>}
