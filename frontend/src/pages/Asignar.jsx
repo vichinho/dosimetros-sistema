@@ -7,7 +7,7 @@ import {
   getTiposPorta,
   getTareasDisponibles,
 } from '../api/endpoints'
-import { Card, Button, Input, Select, Alert } from '../components/ui'
+import { Card, Button, Input, Alert } from '../components/ui'
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 
@@ -128,24 +128,27 @@ export default function Asignar() {
               required
             />
 
-            <Select label="Ejecutivo" value={form.ejecutivoId} onChange={set('ejecutivoId')} required>
-              <option value="">Selecciona…</option>
-              {ejecutivos.map((e) => (
-                <option key={e.id} value={e.id}>{e.nombre}</option>
-              ))}
-            </Select>
-            <Select label="Empresa" value={form.empresaId} onChange={set('empresaId')} required>
-              <option value="">Selecciona…</option>
-              {empresas.map((e) => (
-                <option key={e.id} value={e.id}>{e.nombre}</option>
-              ))}
-            </Select>
-            <Select label="Tipo de porta" value={form.tipoPortaId} onChange={set('tipoPortaId')} required>
-              <option value="">Selecciona…</option>
-              {portas.map((p) => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
-            </Select>
+            <Combobox
+              label="Ejecutivo"
+              options={ejecutivos.map((e) => ({ value: e.id, label: e.nombre }))}
+              value={form.ejecutivoId}
+              onChange={(v) => setForm((f) => ({ ...f, ejecutivoId: v }))}
+              required
+            />
+            <Combobox
+              label="Empresa"
+              options={empresas.map((e) => ({ value: e.id, label: e.nombre }))}
+              value={form.empresaId}
+              onChange={(v) => setForm((f) => ({ ...f, empresaId: v }))}
+              required
+            />
+            <Combobox
+              label="Tipo de porta"
+              options={portas.map((p) => ({ value: p.id, label: p.nombre }))}
+              value={form.tipoPortaId}
+              onChange={(v) => setForm((f) => ({ ...f, tipoPortaId: v }))}
+              required
+            />
 
             {/* Trimestre: valida formato y autocompleta el año */}
             <label className="block">
