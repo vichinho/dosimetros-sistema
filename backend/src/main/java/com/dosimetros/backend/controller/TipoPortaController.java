@@ -39,13 +39,13 @@ public class TipoPortaController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<TipoPortaResponse> crear(@Valid @RequestBody TipoPortaRequest request) {
         return ResponseEntity.ok(tipoPortaService.crear(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<TipoPortaResponse> actualizar(
             @PathVariable Integer id,
             @Valid @RequestBody TipoPortaRequest request) {
@@ -53,7 +53,7 @@ public class TipoPortaController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
         tipoPortaService.eliminar(id);
         return ResponseEntity.noContent().build();

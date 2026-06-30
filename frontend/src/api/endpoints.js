@@ -14,6 +14,10 @@ export const desactivarUsuario = (id) => client.patch(`/usuarios/${id}/desactiva
 export const getEmpresas = () => client.get('/empresas').then((r) => r.data)
 export const getTiposDosimetro = () => client.get('/tipos-dosimetro').then((r) => r.data)
 export const getTiposPorta = () => client.get('/tipos-porta').then((r) => r.data)
+export const crearTipoPorta = (data) => client.post('/tipos-porta', data).then((r) => r.data)
+export const actualizarTipoPorta = (id, data) =>
+  client.put(`/tipos-porta/${id}`, data).then((r) => r.data)
+export const eliminarTipoPorta = (id) => client.delete(`/tipos-porta/${id}`)
 export const getTareas = () => client.get('/tareas').then((r) => r.data)
 export const getTareasDisponibles = (tipoDosimetroId) =>
   client
