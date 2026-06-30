@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface AsignacionRepository extends JpaRepository<Asignacion, Integer> {
@@ -12,6 +13,46 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>
     List<Asignacion> findByDosimetroIdOrderByFechaAsignacionDesc(Integer dosimetroId);
 
     List<Asignacion> findByEjecutivoIdOrderByTrimestreDescFechaAsignacionDesc(Integer ejecutivoId);
+
+    // Vista ejecutivo con multifiltros (todos opcionales).
+    @Query("""
+        SELECT a FROM Asignacion a
+        WHERE a.ejecutivo.id = :ejecutivoId
+          AND (:clienteId IS NULL OR a.cliente.id = :clienteId)
+          AND (:trimestre IS NULL OR a.trimestre = :trimestre)
+          AND (:fecha IS NULL OR a.fechaAsignacion = :fecha)
+          AND (:tipoPortaId IS NULL OR a.tipoPorta.id = :tipoPortaId)
+          AND (:numeroBandeja IS NULL OR a.numeroBandeja = :numeroBandeja)
+          AND (:slotBandeja IS NULL OR a.slotBandeja = :slotBandeja)
+          AND (:link IS NULL OR LOWER(a.linkTrello) LIKE LOWER(CONCAT('%', :link, '%')))
+        ORDER BY a.trimestre DESC, a.fechaAsignacion DESC
+    """)
+    List<Asignacion> filtrarPorEjecutivo(
+            @Param("ejecutivoId") Integer ejecutivoId,
+            @Param("clienteId") Integer clienteId,
+            @Param("trimestre") String trimestre,
+            @Param("fecha") LocalDate fecha,
+            @Param("tipoPortaId") Integer tipoPortaId,
+            @Param("numeroBandeja") Integer numeroBandeja,
+            @Param("slotBandeja") Integer slotBandeja,
+            @Param("link") String link
+    );
+
+    // Opciones de filtro acotadas a las asignaciones del ejecutivo
+    @Query("SELECT DISTINCT a.trimestre FROM Asignacion a WHERE a.ejecutivo.id = :ejecutivoId ORDER BY a.trimestre DESC")
+    List<String> trimestresDeEjecutivo(@Param("ejecutivoId") Integer ejecutivoId);
+
+    @Query("""
+        SELECT DISTINCT c.id, c.razonSocial FROM Asignacion a JOIN a.cliente c
+        WHERE a.ejecutivo.id = :ejecutivoId ORDER BY c.razonSocial
+    """)
+    List<Object[]> clientesDeEjecutivo(@Param("ejecutivoId") Integer ejecutivoId);
+
+    @Query("""
+        SELECT DISTINCT tp.id, tp.nombre FROM Asignacion a JOIN a.tipoPorta tp
+        WHERE a.ejecutivo.id = :ejecutivoId ORDER BY tp.nombre
+    """)
+    List<Object[]> portasDeEjecutivo(@Param("ejecutivoId") Integer ejecutivoId);
 
     // HU #17: KPIs de asignaciones (todos opcionalmente filtrados por trimestre)
     @Query("SELECT COUNT(a) FROM Asignacion a WHERE (:trimestre IS NULL OR a.trimestre = :trimestre)")

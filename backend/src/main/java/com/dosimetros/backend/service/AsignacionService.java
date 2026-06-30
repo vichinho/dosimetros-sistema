@@ -5,6 +5,8 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
 import com.dosimetros.backend.dto.asignacion.LoteAsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.MisFiltrosResponse;
+import com.dosimetros.backend.dto.asignacion.OpcionResponse;
 import com.dosimetros.backend.entity.Asignacion;
 import com.dosimetros.backend.entity.Cliente;
 import com.dosimetros.backend.entity.Dosimetro;
@@ -65,6 +67,31 @@ public class AsignacionService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    // Vista ejecutivo con multifiltros (todos opcionales).
+    public List<AsignacionResponse> filtrarPorEjecutivo(
+            Integer ejecutivoId, Integer clienteId, String trimestre, java.time.LocalDate fecha,
+            Integer tipoPortaId, Integer numeroBandeja, Integer slotBandeja, String link) {
+        String tri = (trimestre == null || trimestre.isBlank()) ? null : trimestre.trim();
+        String lk = (link == null || link.isBlank()) ? null : link.trim();
+        return asignacionRepository.filtrarPorEjecutivo(
+                        ejecutivoId, clienteId, tri, fecha, tipoPortaId, numeroBandeja, slotBandeja, lk)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // Opciones disponibles para los filtros del ejecutivo.
+    public MisFiltrosResponse opcionesFiltroEjecutivo(Integer ejecutivoId) {
+        List<OpcionResponse> clientes = asignacionRepository.clientesDeEjecutivo(ejecutivoId).stream()
+                .map(o -> new OpcionResponse((Integer) o[0], (String) o[1]))
+                .toList();
+        List<OpcionResponse> portas = asignacionRepository.portasDeEjecutivo(ejecutivoId).stream()
+                .map(o -> new OpcionResponse((Integer) o[0], (String) o[1]))
+                .toList();
+        return new MisFiltrosResponse(
+                asignacionRepository.trimestresDeEjecutivo(ejecutivoId), clientes, portas);
     }
 
     // HU #15: asignaciones del ejecutivo agrupadas por trimestre y fecha (lotes enviados).

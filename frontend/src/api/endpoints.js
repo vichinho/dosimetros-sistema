@@ -18,6 +18,10 @@ export const getKpis = (trimestre) =>
 export const getStock = (params) =>
   client.get('/dosimetros/stock', { params }).then((r) => r.data)
 export const getDisponibles = () => client.get('/dosimetros/disponibles').then((r) => r.data)
+export const getPortasDisponibles = () =>
+  client.get('/dosimetros/disponibles/portas').then((r) => r.data)
+export const exportarStockExcel = (params) =>
+  client.get('/dosimetros/stock/export', { params, responseType: 'blob' }).then((r) => r.data)
 export const buscarDosimetro = (numero) =>
   client.get('/dosimetros/buscar', { params: { numero } }).then((r) => r.data)
 export const getDuplicados = () => client.get('/dosimetros/duplicados').then((r) => r.data)
@@ -56,6 +60,7 @@ export const asignarMasivo = (data) =>
 
 // --- Vistas del ejecutivo ---
 export const getMisClientes = () => client.get('/ejecutivo/mis-clientes').then((r) => r.data)
-export const getMisAsignaciones = () =>
-  client.get('/ejecutivo/mis-asignaciones').then((r) => r.data)
+export const getMisAsignaciones = (params) =>
+  client.get('/ejecutivo/mis-asignaciones', { params }).then((r) => r.data)
+export const getMisFiltros = () => client.get('/ejecutivo/mis-filtros').then((r) => r.data)
 export const getMisLotes = () => client.get('/ejecutivo/mis-lotes').then((r) => r.data)

@@ -12,6 +12,7 @@ import Ejecutivos from './pages/Ejecutivos'
 import Duplicados from './pages/Duplicados'
 import Importar from './pages/Importar'
 import MisDosimetros from './pages/MisDosimetros'
+import MisAsignaciones from './pages/MisAsignaciones'
 import MisClientes from './pages/MisClientes'
 
 // Redirige a la pantalla inicial según el rol.
@@ -47,6 +48,10 @@ export default function App() {
         <Route
           path="/mis-dosimetros"
           element={<ProtectedRoute roles={['EJECUTIVO']}><MisDosimetros /></ProtectedRoute>}
+        />
+        <Route
+          path="/mis-asignaciones"
+          element={<ProtectedRoute roles={['EJECUTIVO']}><MisAsignaciones /></ProtectedRoute>}
         />
         <Route
           path="/mis-clientes"

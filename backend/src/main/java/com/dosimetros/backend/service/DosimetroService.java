@@ -7,6 +7,15 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
+import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import com.dosimetros.backend.entity.Asignacion;
 import com.dosimetros.backend.entity.Dosimetro;
 import com.dosimetros.backend.entity.Tarea;
@@ -62,6 +71,50 @@ public class DosimetroService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    // Detalle de stock disponible agrupado por porta (con su tipo de dosímetro).
+    public List<PortaDisponibleResponse> detallePortasDisponibles() {
+        return dosimetroRepository.detallePortasDisponibles().stream()
+                .map(o -> new PortaDisponibleResponse(
+                        (Integer) o[0], (String) o[1], (String) o[2], (Long) o[3]))
+                .toList();
+    }
+
+    // Exporta el stock filtrado a un archivo Excel (.xlsx).
+    public byte[] exportarStockExcel(Integer tipoDosimetroId, Integer tipoPortaId, String estado) {
+        String estadoFinal = (estado == null || estado.isBlank()) ? null : estado;
+        List<Dosimetro> dosimetros = dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, estadoFinal);
+
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Stock");
+            String[] cabeceras = {"Número", "Tipo", "Porta", "Tarea", "Bandeja", "Slot", "Estado", "Observación"};
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < cabeceras.length; i++) {
+                header.createCell(i).setCellValue(cabeceras[i]);
+            }
+
+            int fila = 1;
+            for (Dosimetro d : dosimetros) {
+                Row row = sheet.createRow(fila++);
+                row.createCell(0).setCellValue(d.getNumero() != null ? d.getNumero() : 0);
+                row.createCell(1).setCellValue(d.getTipoDosimetro() != null ? d.getTipoDosimetro().getNombre() : "");
+                row.createCell(2).setCellValue(d.getTipoPorta() != null ? d.getTipoPorta().getNombre() : "");
+                row.createCell(3).setCellValue(d.getTarea() != null ? d.getTarea().getNumeroTarea() : "");
+                if (d.getNumeroBandeja() != null) row.createCell(4).setCellValue(d.getNumeroBandeja());
+                if (d.getSlotBandeja() != null) row.createCell(5).setCellValue(d.getSlotBandeja());
+                row.createCell(6).setCellValue(d.getEstado() != null ? d.getEstado() : "");
+                row.createCell(7).setCellValue(d.getObservacion() != null ? d.getObservacion() : "");
+            }
+            for (int i = 0; i < cabeceras.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Error al generar el Excel de stock", e);
+        }
     }
 
     public List<DosimetroResponse> buscarPorNumero(Integer numero) {
