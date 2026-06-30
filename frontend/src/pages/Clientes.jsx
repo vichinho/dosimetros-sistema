@@ -61,7 +61,7 @@ export default function Clientes() {
             required
           />
           <Input
-            label="Nombre corto"
+            label="Nombre fantasía"
             value={form.nombreCorto}
             onChange={(e) => setForm({ ...form, nombreCorto: e.target.value })}
           />
@@ -88,7 +88,7 @@ export default function Clientes() {
               <thead>
                 <tr className="text-left text-slate-500 border-b border-slate-200">
                   <th className="py-2 font-medium">Razón social</th>
-                  <th className="py-2 font-medium">Nombre corto</th>
+                  <th className="py-2 font-medium">Nombre fantasía</th>
                   <th className="py-2 font-medium">Responsable</th>
                   <th className="py-2 font-medium">Estado asignación</th>
                   <th className="py-2"></th>
