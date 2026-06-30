@@ -7,6 +7,7 @@ import {
   exportarStockExcel,
   marcarDanado,
   marcarBueno,
+  liberarDosimetro,
 } from '../api/endpoints'
 import { Card, Select, Badge, Button, Loading, EmptyState, Pagination } from '../components/ui'
 import { useToast } from '../components/Toast'
@@ -77,6 +78,17 @@ export default function Stock() {
       recargarDetalle()
     } catch (err) {
       toast.error(err.response?.data?.message || 'No se pudo marcar como dañado')
+    }
+  }
+
+  const onLiberar = async (id) => {
+    try {
+      await liberarDosimetro(id)
+      toast.success('Dosímetro liberado (vuelve a disponible)')
+      cargar()
+      recargarDetalle()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo liberar el dosímetro')
     }
   }
 
@@ -196,6 +208,11 @@ export default function Stock() {
                       <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
                     </td>
                     <td className="py-2.5 text-right">
+                      {d.estado === 'asignado' && (
+                        <button onClick={() => onLiberar(d.id)} className="text-steel hover:underline text-sm">
+                          Liberar
+                        </button>
+                      )}
                       {d.estado === 'disponible' && (
                         <button onClick={() => onMarcarDanado(d.id)} className="text-amber-600 hover:underline text-sm">
                           Marcar dañado

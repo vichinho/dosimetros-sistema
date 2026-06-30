@@ -6,10 +6,12 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Stock from './pages/Stock'
 import Asignar from './pages/Asignar'
+import Armar from './pages/Armar'
 import Buscar from './pages/Buscar'
 import Clientes from './pages/Clientes'
 import Ejecutivos from './pages/Ejecutivos'
 import Duplicados from './pages/Duplicados'
+import TiposPorta from './pages/TiposPorta'
 import Importar from './pages/Importar'
 import Usuarios from './pages/Usuarios'
 import MisDosimetros from './pages/MisDosimetros'
@@ -40,11 +42,13 @@ export default function App() {
       >
         <Route path="/" element={<Home />} />
         <Route path="/stock" element={<ProtectedRoute roles={OPER}><Stock /></ProtectedRoute>} />
+        <Route path="/armar" element={<ProtectedRoute roles={OPER}><Armar /></ProtectedRoute>} />
         <Route path="/asignar" element={<ProtectedRoute roles={OPER}><Asignar /></ProtectedRoute>} />
         <Route path="/buscar" element={<ProtectedRoute roles={OPER}><Buscar /></ProtectedRoute>} />
         <Route path="/clientes" element={<ProtectedRoute roles={OPER}><Clientes /></ProtectedRoute>} />
         <Route path="/ejecutivos" element={<ProtectedRoute roles={OPER}><Ejecutivos /></ProtectedRoute>} />
         <Route path="/duplicados" element={<ProtectedRoute roles={OPER}><Duplicados /></ProtectedRoute>} />
+        <Route path="/tipos-porta" element={<ProtectedRoute roles={OPER}><TiposPorta /></ProtectedRoute>} />
         <Route path="/importar" element={<ProtectedRoute roles={['ADMIN']}><Importar /></ProtectedRoute>} />
         <Route path="/usuarios" element={<ProtectedRoute roles={['ADMIN']}><Usuarios /></ProtectedRoute>} />
         <Route
