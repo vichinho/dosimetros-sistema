@@ -60,6 +60,7 @@ export const asignarMasivo = (data) =>
 
 // --- Vistas del ejecutivo ---
 export const getMisClientes = () => client.get('/ejecutivo/mis-clientes').then((r) => r.data)
-export const getMisAsignaciones = () =>
-  client.get('/ejecutivo/mis-asignaciones').then((r) => r.data)
+export const getMisAsignaciones = (params) =>
+  client.get('/ejecutivo/mis-asignaciones', { params }).then((r) => r.data)
+export const getMisFiltros = () => client.get('/ejecutivo/mis-filtros').then((r) => r.data)
 export const getMisLotes = () => client.get('/ejecutivo/mis-lotes').then((r) => r.data)
