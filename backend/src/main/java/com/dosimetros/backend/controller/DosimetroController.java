@@ -103,6 +103,18 @@ public class DosimetroController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{id}/danado")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<DosimetroResponse> marcarDanado(@PathVariable Integer id) {
+        return ResponseEntity.ok(service.marcarDanado(id));
+    }
+
+    @PatchMapping("/{id}/bueno")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<DosimetroResponse> marcarBueno(@PathVariable Integer id) {
+        return ResponseEntity.ok(service.marcarBueno(id));
+    }
+
     @PatchMapping("/{id}/stock-emergencia")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DosimetroResponse> marcarStockEmergencia(

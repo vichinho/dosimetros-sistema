@@ -16,6 +16,17 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
 
     List<Dosimetro> findByNumeroOrderByIdAsc(Integer numero);
 
+    boolean existsByNumero(Integer numero);
+
+    // HU buscar: solo dosímetros que ya tienen al menos una asignación (fueron asignados)
+    @Query("""
+        SELECT d FROM Dosimetro d
+        WHERE d.numero = :numero
+          AND EXISTS (SELECT 1 FROM Asignacion a WHERE a.dosimetro.id = d.id)
+        ORDER BY d.id ASC
+    """)
+    List<Dosimetro> findByNumeroConAsignacion(@Param("numero") Integer numero);
+
     boolean existsByNumeroAndTipoDosimetroIdAndTipoPortaIdAndEstado(
             Integer numero,
             Integer tipoDosimetroId,

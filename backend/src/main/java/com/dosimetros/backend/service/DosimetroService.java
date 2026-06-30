@@ -71,10 +71,12 @@ public class DosimetroService {
                 .toList();
     }
 
+    // Buscar: solo dosímetros que ya fueron asignados (tienen historial de asignación).
     public List<DosimetroDetalleResponse> buscarDetallePorNumero(Integer numero) {
-        List<Dosimetro> dosimetros = dosimetroRepository.findByNumeroOrderByIdAsc(numero);
+        List<Dosimetro> dosimetros = dosimetroRepository.findByNumeroConAsignacion(numero);
         if (dosimetros.isEmpty()) {
-            throw new ResourceNotFoundException("No se encontraron dosímetros con número: " + numero);
+            throw new ResourceNotFoundException(
+                    "No se encontraron dosímetros asignados con número: " + numero);
         }
         return dosimetros.stream().map(this::toDetalleResponse).toList();
     }
@@ -157,6 +159,29 @@ public class DosimetroService {
                 .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
         String obs = (observacion == null || observacion.isBlank()) ? "stock emergencia" : observacion;
         dosimetro.setObservacion(obs);
+        return toResponse(dosimetroRepository.save(dosimetro));
+    }
+
+    // Marca un dosímetro como dañado (no podrá asignarse). Debe estar libre.
+    public DosimetroResponse marcarDanado(Integer id) {
+        Dosimetro dosimetro = dosimetroRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
+        if ("asignado".equalsIgnoreCase(dosimetro.getEstado())) {
+            throw new IllegalArgumentException(
+                    "El dosímetro está asignado; libéralo antes de marcarlo como dañado");
+        }
+        dosimetro.setEstado("dañado");
+        return toResponse(dosimetroRepository.save(dosimetro));
+    }
+
+    // Marca como bueno un dosímetro dañado (vuelve a disponible).
+    public DosimetroResponse marcarBueno(Integer id) {
+        Dosimetro dosimetro = dosimetroRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
+        if (!"dañado".equalsIgnoreCase(dosimetro.getEstado())) {
+            throw new IllegalArgumentException("El dosímetro no está marcado como dañado");
+        }
+        dosimetro.setEstado("disponible");
         return toResponse(dosimetroRepository.save(dosimetro));
     }
 
