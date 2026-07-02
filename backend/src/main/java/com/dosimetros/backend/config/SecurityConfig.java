@@ -57,7 +57,8 @@ public class SecurityConfig {
 public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration config = new CorsConfiguration();
 
-    if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+    boolean origenesDefinidos = allowedOrigins != null && !allowedOrigins.isBlank();
+    if (origenesDefinidos) {
         config.setAllowedOrigins(
             Arrays.stream(allowedOrigins.split(",")).map(String::trim).toList()
         );
@@ -67,7 +68,9 @@ public CorsConfigurationSource corsConfigurationSource() {
 
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*"));
-    config.setAllowCredentials(true);
+    // Credenciales (cookies) solo con orígenes explícitos; con comodín se deshabilita
+    // por seguridad. La app usa JWT en el header Authorization, así que no las necesita.
+    config.setAllowCredentials(origenesDefinidos);
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", config); // <-- era /api/**, debe ser /**
