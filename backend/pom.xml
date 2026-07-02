@@ -114,6 +114,21 @@
                     </excludes>
                 </configuration>
             </plugin>
+
+            <!-- Análisis de vulnerabilidades de dependencias (OWASP).
+                 No está ligado a ninguna fase: ejecutar manualmente/en CI con:
+                 ./mvnw dependency-check:check
+                 (la primera vez descarga la base de datos NVD). -->
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>10.0.4</version>
+                <configuration>
+                    <failBuildOnCVSS>7</failBuildOnCVSS>
+                    <skipProvidedScope>true</skipProvidedScope>
+                    <skipTestScope>true</skipTestScope>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
