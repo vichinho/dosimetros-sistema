@@ -20,7 +20,7 @@ public class StartupSecurityCheck {
 
     // Valores por defecto que NO deben usarse en producción.
     private static final String DEFAULT_JWT_SECRET =
-            "affc0cf53e35e4b878a1e8d20f7595bd4c83fc728b197cd7d2b6c37a89272412";
+            "dev-insecure-jwt-secret-change-me-in-prod-0123456789";
     private static final String DEFAULT_DB_PASSWORD = "1234";
 
     private final Environment env;
