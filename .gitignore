@@ -5,3 +5,7 @@ migracion/*.sql
 # Variables de entorno con secretos (NO versionar)
 .env
 .env.local
+
+# Logs
+*.log
+backend/log.txt
