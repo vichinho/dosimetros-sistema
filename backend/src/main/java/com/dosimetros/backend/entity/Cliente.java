@@ -1,14 +1,9 @@
 package com.dosimetros.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @Table(name = "cliente")
-@Getter @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Cliente {
 
     @Id
@@ -21,7 +16,53 @@ public class Cliente {
     @Column(name = "nombre_corto", length = 200)
     private String nombreCorto;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ejecutivo_id")
+    private Ejecutivo ejecutivo;
+
     @Column(nullable = false)
-    @Builder.Default
     private Boolean activo = true;
+
+    public Cliente() {
+    }
+
+    public Ejecutivo getEjecutivo() {
+        return ejecutivo;
+    }
+
+    public void setEjecutivo(Ejecutivo ejecutivo) {
+        this.ejecutivo = ejecutivo;
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getRazonSocial() {
+        return razonSocial;
+    }
+
+    public void setRazonSocial(String razonSocial) {
+        this.razonSocial = razonSocial;
+    }
+
+    public String getNombreCorto() {
+        return nombreCorto;
+    }
+
+    public void setNombreCorto(String nombreCorto) {
+        this.nombreCorto = nombreCorto;
+    }
+
+    public Boolean getActivo() {
+        return activo;
+    }
+
+    public void setActivo(Boolean activo) {
+        this.activo = activo;
+    }
 }

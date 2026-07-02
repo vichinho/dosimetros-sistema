@@ -1,36 +1,130 @@
 package com.dosimetros.backend.repository;
 
 import com.dosimetros.backend.entity.Dosimetro;
-import com.dosimetros.backend.entity.EstadoDosimetro;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
-@Repository
 public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
 
-    // HU-14: buscar por número físico (puede retornar múltiples por duplicados)
-    List<Dosimetro> findByNumero(Integer numero);
+    Optional<Dosimetro> findByNumeroAndEstado(Integer numero, String estado);
 
-    // HU-7: stock disponible filtrado por tipo y estado
-    List<Dosimetro> findByTipoDosimetroIdAndEstado(Integer tipoDosimetroId, EstadoDosimetro estado);
+    List<Dosimetro> findByEstadoOrderByNumeroAsc(String estado);
 
-    // HU-10: dosímetros disponibles en una tarea con tipo de porta específico
-    List<Dosimetro> findByTareaIdAndTipoPortaIdAndEstado(
-            Integer tareaId,
+    List<Dosimetro> findByNumeroOrderByIdAsc(Integer numero);
+
+    boolean existsByNumero(Integer numero);
+
+    // HU buscar: solo dosímetros que ya tienen al menos una asignación (fueron asignados)
+    @Query("""
+        SELECT d FROM Dosimetro d
+        WHERE d.numero = :numero
+          AND EXISTS (SELECT 1 FROM Asignacion a WHERE a.dosimetro.id = d.id)
+        ORDER BY d.id ASC
+    """)
+    List<Dosimetro> findByNumeroConAsignacion(@Param("numero") Integer numero);
+
+    boolean existsByNumeroAndTipoDosimetroIdAndTipoPortaIdAndEstado(
+            Integer numero,
+            Integer tipoDosimetroId,
             Integer tipoPortaId,
-            EstadoDosimetro estado
+            String estado
     );
 
-    // HU-9: detectar números físicos duplicados
-    @Query("SELECT d.numero FROM Dosimetro d GROUP BY d.numero HAVING COUNT(d.numero) > 1")
-    List<Integer> findNumerosDuplicados();
+    @Query("""
+        SELECT d FROM Dosimetro d
+        WHERE (:tipoDosimetroId IS NULL OR d.tipoDosimetro.id = :tipoDosimetroId)
+          AND (:tipoPortaId IS NULL OR d.tipoPorta.id = :tipoPortaId)
+          AND (:estado IS NULL OR d.estado = :estado)
+        ORDER BY d.numero ASC
+    """)
+    List<Dosimetro> filtrar(
+            @Param("tipoDosimetroId") Integer tipoDosimetroId,
+            @Param("tipoPortaId") Integer tipoPortaId,
+            @Param("estado") String estado
+    );
 
-    // Conteo de disponibles por tipo (para KPIs - HU-17)
-    @Query("SELECT d.tipoDosimetro.nombre, COUNT(d) FROM Dosimetro d " +
-           "WHERE d.estado = 'disponible' GROUP BY d.tipoDosimetro.nombre")
-    List<Object[]> countDisponiblesByTipo();
+    @Query("""
+        SELECT d FROM Dosimetro d
+        WHERE d.tarea.id = :tareaId
+          AND d.numeroBandeja >= :bandejaDesde
+          AND d.numeroBandeja <= :bandejaHasta
+          AND (:slotDesde IS NULL OR d.slotBandeja >= :slotDesde)
+          AND (:slotHasta IS NULL OR d.slotBandeja <= :slotHasta)
+    """)
+    List<Dosimetro> findByTareaYRangoBandejaSlot(
+            @Param("tareaId") Integer tareaId,
+            @Param("bandejaDesde") Integer bandejaDesde,
+            @Param("bandejaHasta") Integer bandejaHasta,
+            @Param("slotDesde") Integer slotDesde,
+            @Param("slotHasta") Integer slotHasta
+    );
+
+    @Query("""
+        SELECT d FROM Dosimetro d
+        WHERE d.estado = 'disponible'
+          AND d.tarea.id IN :tareaIds
+          AND d.tipoDosimetro.id = :tipoDosimetroId
+        ORDER BY d.tarea.id ASC, d.numeroBandeja ASC, d.slotBandeja ASC
+    """)
+    List<Dosimetro> findDisponiblesCompatiblesEnTareas(
+            @Param("tareaIds") List<Integer> tareaIds,
+            @Param("tipoDosimetroId") Integer tipoDosimetroId
+    );
+
+    // HU #9: dosímetros cuyo número físico se repite (más de un id con el mismo numero)
+    @Query("""
+        SELECT d FROM Dosimetro d
+        WHERE d.numero IN (
+            SELECT d2.numero FROM Dosimetro d2 GROUP BY d2.numero HAVING COUNT(d2) > 1
+        )
+        ORDER BY d.numero ASC, d.id ASC
+    """)
+    List<Dosimetro> findDuplicados();
+
+    // HU #17: KPIs de stock
+    @Query("SELECT d.estado, COUNT(d) FROM Dosimetro d GROUP BY d.estado ORDER BY d.estado")
+    List<Object[]> contarPorEstado();
+
+    @Query("""
+        SELECT t.id, t.nombre, COUNT(d)
+        FROM Dosimetro d JOIN d.tipoDosimetro t
+        GROUP BY t.id, t.nombre
+        ORDER BY t.nombre
+    """)
+    List<Object[]> contarPorTipoDosimetro();
+
+    // Disponibles para asignar, desglosados por tipo de porta (estado de armado).
+    @Query("""
+        SELECT tp.id, tp.nombre, COUNT(d)
+        FROM Dosimetro d JOIN d.tipoPorta tp
+        WHERE d.estado = 'disponible'
+        GROUP BY tp.id, tp.nombre
+        ORDER BY COUNT(d) DESC
+    """)
+    List<Object[]> contarDisponiblesPorPorta();
+
+    // Tareas con dosímetros disponibles (opcionalmente de un tipo de dosímetro).
+    @Query("""
+        SELECT t.id, t.numeroTarea, COUNT(d)
+        FROM Dosimetro d JOIN d.tarea t
+        WHERE d.estado = 'disponible'
+          AND (:tipoDosimetroId IS NULL OR d.tipoDosimetro.id = :tipoDosimetroId)
+        GROUP BY t.id, t.numeroTarea
+        ORDER BY t.numeroTarea ASC
+    """)
+    List<Object[]> tareasConDisponibles(@Param("tipoDosimetroId") Integer tipoDosimetroId);
+
+    // Detalle de portas disponibles: porta + tipo de dosímetro + cantidad.
+    @Query("""
+        SELECT tp.id, tp.nombre, td.nombre, COUNT(d)
+        FROM Dosimetro d JOIN d.tipoPorta tp JOIN tp.tipoDosimetro td
+        WHERE d.estado = 'disponible'
+        GROUP BY tp.id, tp.nombre, td.nombre
+        ORDER BY td.nombre ASC, COUNT(d) DESC
+    """)
+    List<Object[]> detallePortasDisponibles();
 }

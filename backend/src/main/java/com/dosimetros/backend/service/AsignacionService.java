@@ -1,0 +1,280 @@
+package com.dosimetros.backend.service;
+
+import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
+import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
+import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
+import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.LoteAsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.MisFiltrosResponse;
+import com.dosimetros.backend.dto.asignacion.OpcionResponse;
+import com.dosimetros.backend.entity.Asignacion;
+import com.dosimetros.backend.entity.Cliente;
+import com.dosimetros.backend.entity.Dosimetro;
+import com.dosimetros.backend.entity.Ejecutivo;
+import com.dosimetros.backend.entity.Empresa;
+import com.dosimetros.backend.entity.TipoPorta;
+import com.dosimetros.backend.exception.ResourceNotFoundException;
+import com.dosimetros.backend.repository.AsignacionRepository;
+import com.dosimetros.backend.repository.ClienteRepository;
+import com.dosimetros.backend.repository.DosimetroRepository;
+import com.dosimetros.backend.repository.EjecutivoRepository;
+import com.dosimetros.backend.repository.EmpresaRepository;
+import com.dosimetros.backend.repository.TipoPortaRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class AsignacionService {
+
+    private final AsignacionRepository asignacionRepository;
+    private final DosimetroRepository dosimetroRepository;
+    private final ClienteRepository clienteRepository;
+    private final EjecutivoRepository ejecutivoRepository;
+    private final EmpresaRepository empresaRepository;
+    private final TipoPortaRepository tipoPortaRepository;
+
+    public AsignacionService(AsignacionRepository asignacionRepository,
+                             DosimetroRepository dosimetroRepository,
+                             ClienteRepository clienteRepository,
+                             EjecutivoRepository ejecutivoRepository,
+                             EmpresaRepository empresaRepository,
+                             TipoPortaRepository tipoPortaRepository) {
+        this.asignacionRepository = asignacionRepository;
+        this.dosimetroRepository = dosimetroRepository;
+        this.clienteRepository = clienteRepository;
+        this.ejecutivoRepository = ejecutivoRepository;
+        this.empresaRepository = empresaRepository;
+        this.tipoPortaRepository = tipoPortaRepository;
+    }
+
+    public List<AsignacionResponse> listarPorDosimetro(Integer dosimetroId) {
+        return asignacionRepository.findByDosimetroIdOrderByFechaAsignacionDesc(dosimetroId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // HU #3 / #15: dosímetros asignados a los clientes del ejecutivo logueado.
+    public List<AsignacionResponse> listarPorEjecutivo(Integer ejecutivoId) {
+        return asignacionRepository
+                .findByEjecutivoIdOrderByTrimestreDescFechaAsignacionDesc(ejecutivoId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // Asignaciones de un cliente (para el detalle del cliente).
+    public List<AsignacionResponse> listarPorCliente(Integer clienteId) {
+        return asignacionRepository.findByClienteIdOrderByFechaAsignacionDesc(clienteId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // Vista ejecutivo con multifiltros (todos opcionales).
+    public List<AsignacionResponse> filtrarPorEjecutivo(
+            Integer ejecutivoId, Integer clienteId, String trimestre, java.time.LocalDate fecha,
+            Integer tipoPortaId, Integer numeroBandeja, Integer slotBandeja, String link) {
+        String tri = (trimestre == null || trimestre.isBlank()) ? null : trimestre.trim();
+        String lk = (link == null || link.isBlank()) ? null : link.trim();
+        return asignacionRepository.filtrarPorEjecutivo(
+                        ejecutivoId, clienteId, tri, fecha, tipoPortaId, numeroBandeja, slotBandeja, lk)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // Opciones disponibles para los filtros del ejecutivo.
+    public MisFiltrosResponse opcionesFiltroEjecutivo(Integer ejecutivoId) {
+        List<OpcionResponse> clientes = asignacionRepository.clientesDeEjecutivo(ejecutivoId).stream()
+                .map(o -> new OpcionResponse((Integer) o[0], (String) o[1]))
+                .toList();
+        List<OpcionResponse> portas = asignacionRepository.portasDeEjecutivo(ejecutivoId).stream()
+                .map(o -> new OpcionResponse((Integer) o[0], (String) o[1]))
+                .toList();
+        return new MisFiltrosResponse(
+                asignacionRepository.trimestresDeEjecutivo(ejecutivoId), clientes, portas);
+    }
+
+    // HU #15: asignaciones del ejecutivo agrupadas por trimestre y fecha (lotes enviados).
+    public List<LoteAsignacionResponse> listarLotesPorEjecutivo(Integer ejecutivoId) {
+        List<AsignacionResponse> asignaciones = listarPorEjecutivo(ejecutivoId);
+
+        Map<String, LoteAsignacionResponse> lotes = new LinkedHashMap<>();
+        for (AsignacionResponse a : asignaciones) {
+            String clave = a.getTrimestre() + "|" + a.getFechaAsignacion();
+            LoteAsignacionResponse lote = lotes.computeIfAbsent(clave, k ->
+                    new LoteAsignacionResponse(
+                            a.getTrimestre(),
+                            a.getFechaAsignacion(),
+                            0,
+                            new ArrayList<>()
+                    ));
+            lote.getAsignaciones().add(a);
+        }
+
+        List<LoteAsignacionResponse> resultado = new ArrayList<>(lotes.values());
+        resultado.forEach(lote -> lote.setCantidad(lote.getAsignaciones().size()));
+        return resultado;
+    }
+
+    @Transactional
+    public AsignacionResponse crear(AsignacionRequest request) {
+        Dosimetro dosimetro = dosimetroRepository.findById(request.getDosimetroId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Dosímetro no encontrado con id: " + request.getDosimetroId()
+                ));
+
+        Cliente cliente = clienteRepository.findById(request.getClienteId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cliente no encontrado con id: " + request.getClienteId()
+                ));
+
+        Ejecutivo ejecutivo = ejecutivoRepository.findById(request.getEjecutivoId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Ejecutivo no encontrado con id: " + request.getEjecutivoId()
+                ));
+
+        Empresa empresa = empresaRepository.findById(request.getEmpresaId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Empresa no encontrada con id: " + request.getEmpresaId()
+                ));
+
+        TipoPorta tipoPorta = tipoPortaRepository.findById(request.getTipoPortaId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de porta no encontrado con id: " + request.getTipoPortaId()
+                ));
+
+        if (!"disponible".equalsIgnoreCase(dosimetro.getEstado())) {
+            throw new IllegalArgumentException("El dosímetro no está disponible para asignación");
+        }
+
+        if (!tipoPorta.getTipoDosimetro().getId().equals(dosimetro.getTipoDosimetro().getId())) {
+            throw new IllegalArgumentException("El tipo de porta no es compatible con el tipo de dosímetro");
+        }
+
+        Asignacion asignacion = new Asignacion();
+        asignacion.setDosimetro(dosimetro);
+        asignacion.setCliente(cliente);
+        asignacion.setEjecutivo(ejecutivo);
+        asignacion.setEmpresa(empresa);
+        asignacion.setTipoPorta(tipoPorta);
+        asignacion.setTarea(dosimetro.getTarea());
+        asignacion.setNumeroBandeja(dosimetro.getNumeroBandeja());
+        asignacion.setSlotBandeja(dosimetro.getSlotBandeja());
+        asignacion.setTrimestre(request.getTrimestre());
+        asignacion.setFechaAsignacion(
+                request.getFechaAsignacion() != null ? request.getFechaAsignacion() : LocalDate.now()
+        );
+        asignacion.setLinkTrello(request.getLinkTrello());
+
+        Asignacion guardada = asignacionRepository.save(asignacion);
+
+        dosimetro.setEstado("asignado");
+        dosimetroRepository.save(dosimetro);
+
+        return toResponse(guardada);
+    }
+
+    @Transactional
+    public AsignacionMasivaResponse asignarMasivo(AsignacionMasivaRequest request) {
+        Cliente cliente = clienteRepository.findById(request.getClienteId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cliente no encontrado con id: " + request.getClienteId()
+                ));
+
+        Ejecutivo ejecutivo = ejecutivoRepository.findById(request.getEjecutivoId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Ejecutivo no encontrado con id: " + request.getEjecutivoId()
+                ));
+
+        Empresa empresa = empresaRepository.findById(request.getEmpresaId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Empresa no encontrada con id: " + request.getEmpresaId()
+                ));
+
+        TipoPorta tipoPorta = tipoPortaRepository.findById(request.getTipoPortaId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de porta no encontrado con id: " + request.getTipoPortaId()
+                ));
+
+        // Solo se eligen dosímetros disponibles dentro de las tareas seleccionadas
+        // cuyo tipo de dosímetro sea compatible con el tipo de porta solicitado.
+        List<Dosimetro> compatibles = dosimetroRepository.findDisponiblesCompatiblesEnTareas(
+                request.getTareaIds(),
+                tipoPorta.getTipoDosimetro().getId()
+        );
+
+        if (compatibles.size() < request.getCantidad()) {
+            throw new IllegalArgumentException(
+                    "Stock insuficiente: se solicitaron " + request.getCantidad()
+                            + " dosímetros compatibles pero solo hay " + compatibles.size()
+                            + " disponibles en las tareas seleccionadas"
+            );
+        }
+
+        LocalDate fecha = request.getFechaAsignacion() != null
+                ? request.getFechaAsignacion()
+                : LocalDate.now();
+
+        List<Dosimetro> seleccionados = compatibles.subList(0, request.getCantidad());
+        List<AsignacionResponse> asignaciones = new ArrayList<>(seleccionados.size());
+
+        for (Dosimetro dosimetro : seleccionados) {
+            Asignacion asignacion = new Asignacion();
+            asignacion.setDosimetro(dosimetro);
+            asignacion.setCliente(cliente);
+            asignacion.setEjecutivo(ejecutivo);
+            asignacion.setEmpresa(empresa);
+            asignacion.setTipoPorta(tipoPorta);
+            asignacion.setTarea(dosimetro.getTarea());
+            asignacion.setNumeroBandeja(dosimetro.getNumeroBandeja());
+            asignacion.setSlotBandeja(dosimetro.getSlotBandeja());
+            asignacion.setTrimestre(request.getTrimestre());
+            asignacion.setFechaAsignacion(fecha);
+            asignacion.setLinkTrello(request.getLinkTrello());
+
+            Asignacion guardada = asignacionRepository.save(asignacion);
+
+            dosimetro.setEstado("asignado");
+            dosimetroRepository.save(dosimetro);
+
+            asignaciones.add(toResponse(guardada));
+        }
+
+        return new AsignacionMasivaResponse(
+                request.getCantidad(),
+                asignaciones.size(),
+                asignaciones
+        );
+    }
+
+    private AsignacionResponse toResponse(Asignacion a) {
+        return new AsignacionResponse(
+                a.getId(),
+                a.getDosimetro().getId(),
+                a.getDosimetro().getNumero(),
+                a.getCliente().getId(),
+                a.getCliente().getRazonSocial(),
+                a.getEjecutivo().getId(),
+                a.getEjecutivo().getNombre(),
+                a.getEmpresa().getId(),
+                a.getEmpresa().getNombre(),
+                a.getTipoPorta().getId(),
+                a.getTipoPorta().getNombre(),
+                a.getTarea() != null ? a.getTarea().getId() : null,
+                a.getTarea() != null ? a.getTarea().getNumeroTarea() : null,
+                a.getNumeroBandeja(),
+                a.getSlotBandeja(),
+                a.getTrimestre(),
+                a.getFechaAsignacion(),
+                a.getLinkTrello()
+        );
+    }
+}

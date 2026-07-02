@@ -1,16 +1,11 @@
 package com.dosimetros.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "asignacion")
-@Getter @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Table(name = "ASIGNACION")
 public class Asignacion {
 
     @Id
@@ -37,8 +32,17 @@ public class Asignacion {
     @JoinColumn(name = "tipo_porta_id", nullable = false)
     private TipoPorta tipoPorta;
 
-    // Formato: "1T2025", "2T2026"
-    @Column(nullable = false, length = 20)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tarea_id")
+    private Tarea tarea;
+
+    @Column(name = "numero_bandeja")
+    private Integer numeroBandeja;
+
+    @Column(name = "slot_bandeja")
+    private Integer slotBandeja;
+
+    @Column(name = "trimestre", nullable = false, length = 20)
     private String trimestre;
 
     @Column(name = "fecha_asignacion", nullable = false)
@@ -46,4 +50,103 @@ public class Asignacion {
 
     @Column(name = "link_trello", length = 500)
     private String linkTrello;
+
+    public Asignacion() {
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public Dosimetro getDosimetro() {
+        return dosimetro;
+    }
+
+    public void setDosimetro(Dosimetro dosimetro) {
+        this.dosimetro = dosimetro;
+    }
+
+    public Cliente getCliente() {
+        return cliente;
+    }
+
+    public void setCliente(Cliente cliente) {
+        this.cliente = cliente;
+    }
+
+    public Ejecutivo getEjecutivo() {
+        return ejecutivo;
+    }
+
+    public void setEjecutivo(Ejecutivo ejecutivo) {
+        this.ejecutivo = ejecutivo;
+    }
+
+    public Empresa getEmpresa() {
+        return empresa;
+    }
+
+    public void setEmpresa(Empresa empresa) {
+        this.empresa = empresa;
+    }
+
+    public TipoPorta getTipoPorta() {
+        return tipoPorta;
+    }
+
+    public void setTipoPorta(TipoPorta tipoPorta) {
+        this.tipoPorta = tipoPorta;
+    }
+
+    public Tarea getTarea() {
+        return tarea;
+    }
+
+    public void setTarea(Tarea tarea) {
+        this.tarea = tarea;
+    }
+
+    public Integer getNumeroBandeja() {
+        return numeroBandeja;
+    }
+
+    public void setNumeroBandeja(Integer numeroBandeja) {
+        this.numeroBandeja = numeroBandeja;
+    }
+
+    public Integer getSlotBandeja() {
+        return slotBandeja;
+    }
+
+    public void setSlotBandeja(Integer slotBandeja) {
+        this.slotBandeja = slotBandeja;
+    }
+
+    public String getTrimestre() {
+        return trimestre;
+    }
+
+    public void setTrimestre(String trimestre) {
+        this.trimestre = trimestre;
+    }
+
+    public LocalDate getFechaAsignacion() {
+        return fechaAsignacion;
+    }
+
+    public void setFechaAsignacion(LocalDate fechaAsignacion) {
+        this.fechaAsignacion = fechaAsignacion;
+    }
+
+    public String getLinkTrello() {
+        return linkTrello;
+    }
+
+    public void setLinkTrello(String linkTrello) {
+        this.linkTrello = linkTrello;
+    }
 }

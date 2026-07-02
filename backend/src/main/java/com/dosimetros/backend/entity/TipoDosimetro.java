@@ -1,16 +1,9 @@
 package com.dosimetros.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-
-import java.util.List;
 
 @Entity
 @Table(name = "tipo_dosimetro")
-@Getter @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class TipoDosimetro {
 
     @Id
@@ -20,7 +13,22 @@ public class TipoDosimetro {
     @Column(nullable = false, unique = true, length = 50)
     private String nombre;
 
-    // Relación inversa — no genera columna en BD
-    @OneToMany(mappedBy = "tipoDosimetro", fetch = FetchType.LAZY)
-    private List<TipoPorta> tiposPorta;
+    public TipoDosimetro() {
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
 }
