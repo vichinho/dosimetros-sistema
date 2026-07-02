@@ -41,7 +41,10 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>
     );
 
     // Opciones de filtro acotadas a las asignaciones del ejecutivo
-    @Query("SELECT DISTINCT a.trimestre FROM Asignacion a WHERE a.ejecutivo.id = :ejecutivoId ORDER BY a.trimestre DESC")
+    @Query("""
+        SELECT DISTINCT a.trimestre FROM Asignacion a WHERE a.ejecutivo.id = :ejecutivoId
+        ORDER BY SUBSTRING(a.trimestre, 3, 4) DESC, SUBSTRING(a.trimestre, 1, 1) DESC
+    """)
     List<String> trimestresDeEjecutivo(@Param("ejecutivoId") Integer ejecutivoId);
 
     @Query("""
@@ -96,9 +99,17 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>
     """)
     List<Object[]> contarPorCliente(@Param("trimestre") String trimestre);
 
-    @Query("SELECT a.trimestre, COUNT(a) FROM Asignacion a GROUP BY a.trimestre ORDER BY a.trimestre")
+    // Formato del trimestre: 'QTYYYY' (ej. 2T2025). Se ordena por año y luego trimestre.
+    @Query("""
+        SELECT a.trimestre, COUNT(a) FROM Asignacion a
+        GROUP BY a.trimestre
+        ORDER BY SUBSTRING(a.trimestre, 3, 4) ASC, SUBSTRING(a.trimestre, 1, 1) ASC
+    """)
     List<Object[]> contarPorTrimestre();
 
-    @Query("SELECT DISTINCT a.trimestre FROM Asignacion a ORDER BY a.trimestre")
+    @Query("""
+        SELECT DISTINCT a.trimestre FROM Asignacion a
+        ORDER BY SUBSTRING(a.trimestre, 3, 4) ASC, SUBSTRING(a.trimestre, 1, 1) ASC
+    """)
     List<String> trimestresDistinct();
 }
