@@ -9,6 +9,7 @@ import com.dosimetros.backend.repository.DosimetroRepository;
 import com.dosimetros.backend.repository.TareaRepository;
 import com.dosimetros.backend.repository.TipoDosimetroRepository;
 import com.dosimetros.backend.repository.TipoPortaRepository;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,14 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
     private static final int COL_NUM_REPOSITORIO = 3;
     private static final int COL_NUM_BANDEJA     = 4;
     private static final int COL_SLOT_BANDEJA    = 5;
+
+    // Límite de filas de datos por archivo (evita agotar memoria con archivos gigantes).
+    private static final int MAX_FILAS = 200_000;
+
+    static {
+        // Defensa ante "zip bombs": exige un ratio mínimo de compresión al descomprimir.
+        ZipSecureFile.setMinInflateRatio(0.01);
+    }
 
     private final DosimetroRepository dosimetroRepository;
     private final TipoDosimetroRepository tipoDosimetroRepository;
@@ -89,6 +98,10 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                 if (esFilaVacia(row)) continue;
 
                 totalFilas++;
+                if (totalFilas > MAX_FILAS) {
+                    throw new IllegalArgumentException(
+                            "El archivo supera el máximo de " + MAX_FILAS + " filas permitidas");
+                }
                 int fila = row.getRowNum() + 1; // numero legible para errores (1-based)
 
                 try {
