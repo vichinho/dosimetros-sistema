@@ -6,11 +6,12 @@ import {
   getTiposPorta,
   getStockPortas,
   exportarStockExcel,
+  actualizarStockExcel,
   marcarDanado,
   marcarBueno,
   liberarDosimetro,
 } from '../api/endpoints'
-import { Card, Select, Badge, Button, Loading, EmptyState, Pagination } from '../components/ui'
+import { Card, Select, Badge, Button, Loading, EmptyState, Pagination, Alert } from '../components/ui'
 import { useToast } from '../components/Toast'
 
 const estadoColor = { disponible: 'green', asignado: 'blue', baja: 'red', dañado: 'amber' }
@@ -59,6 +60,11 @@ export default function Stock() {
   const [detallePortas, setDetallePortas] = useState([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
+  // #8 Actualización de stock por archivo (upsert)
+  const [archivo, setArchivo] = useState(null)
+  const [subiendo, setSubiendo] = useState(false)
+  const [resultado, setResultado] = useState(null)
+  const [errorArchivo, setErrorArchivo] = useState('')
   const toast = useToast()
 
   useEffect(() => {
@@ -116,6 +122,32 @@ export default function Stock() {
 
   const recargarDetalle = () => getStockPortas().then(setDetallePortas).catch(() => {})
 
+  const onActualizarArchivo = async (e) => {
+    e.preventDefault()
+    setErrorArchivo('')
+    setResultado(null)
+    if (!archivo) {
+      setErrorArchivo('Selecciona un archivo .xlsx')
+      return
+    }
+    setSubiendo(true)
+    try {
+      const data = await actualizarStockExcel(archivo)
+      setResultado(data)
+      toast.success(
+        `Actualización: ${data.creados} creados, ${data.actualizados} actualizados, ${data.sinCambios} sin cambios`
+      )
+      cargar()
+      recargarDetalle()
+    } catch (err) {
+      const msg = err.response?.data?.message || 'No se pudo actualizar el stock'
+      setErrorArchivo(msg)
+      toast.error(msg)
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
   const conAccion = (fn, ok) => async (id) => {
     try {
       await fn(id)
@@ -162,6 +194,50 @@ export default function Stock() {
                 </div>
               )
             })}
+          </div>
+        )}
+      </Card>
+
+      {/* #8 Actualización de stock por archivo (upsert por número) */}
+      <Card title="Actualizar stock por archivo">
+        <form onSubmit={onActualizarArchivo} className="space-y-3">
+          <p className="text-sm text-slate-500">
+            Sube un <b>.xlsx</b> (columnas: numero_dosimetro, tipo_dosimetro, tipo_porta,
+            numero_tarea, numero_bandeja, slot_bandeja). Se busca por <b>número</b>: si no
+            existe se crea, si cambió se actualiza y si es idéntico se deja igual. Los
+            dosímetros asignados o dados de baja no se modifican.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="file"
+              accept=".xlsx"
+              onChange={(e) => setArchivo(e.target.files[0])}
+              className="block text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-steel file:text-white hover:file:bg-steel/90"
+            />
+            <Button type="submit" disabled={subiendo}>
+              {subiendo ? 'Actualizando…' : 'Actualizar stock'}
+            </Button>
+          </div>
+        </form>
+        {errorArchivo && <div className="mt-3"><Alert type="error">{errorArchivo}</Alert></div>}
+        {resultado && (
+          <div className="mt-4">
+            <div className="flex flex-wrap gap-4 text-sm mb-3">
+              <span>Total filas: <b>{resultado.totalFilas}</b></span>
+              <span className="text-emerald-600">Creados: <b>{resultado.creados}</b></span>
+              <span className="text-steel">Actualizados: <b>{resultado.actualizados}</b></span>
+              <span className="text-ink/60">Sin cambios: <b>{resultado.sinCambios}</b></span>
+              <span className="text-red-600">Con problemas: <b>{resultado.fallidas}</b></span>
+            </div>
+            {resultado.errores?.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-60 overflow-auto">
+                <ul className="text-sm text-red-700 space-y-1">
+                  {resultado.errores.map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </Card>
