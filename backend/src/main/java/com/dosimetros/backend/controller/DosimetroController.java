@@ -3,6 +3,7 @@ package com.dosimetros.backend.controller;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
 import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoRequest;
 import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoResponse;
+import com.dosimetros.backend.dto.dosimetro.ArmarSeleccionRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
@@ -143,6 +144,21 @@ public class DosimetroController {
     public ResponseEntity<ActualizarTipoPortaRangoResponse> actualizarTipoPortaPorRango(
             @Valid @RequestBody ActualizarTipoPortaRangoRequest request) {
         return ResponseEntity.ok(service.actualizarTipoPortaPorRango(request));
+    }
+
+    // #7: dosímetros de una tarea (mapa de bandejas/slots con estado de armado).
+    @GetMapping("/tareas/{tareaId}/dosimetros")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<DosimetroResponse>> dosimetrosDeTarea(@PathVariable Integer tareaId) {
+        return ResponseEntity.ok(service.dosimetrosDeTarea(tareaId));
+    }
+
+    // #7 (modo preciso): arma una selección concreta de dosímetros.
+    @PatchMapping("/porta-seleccion")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<ActualizarTipoPortaRangoResponse> armarSeleccion(
+            @Valid @RequestBody ArmarSeleccionRequest request) {
+        return ResponseEntity.ok(service.armarSeleccion(request.getDosimetroIds(), request.getTipoPortaId()));
     }
 
     @PatchMapping("/{id}/liberar")

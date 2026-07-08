@@ -319,6 +319,38 @@ public class DosimetroService {
         return new ActualizarTipoPortaRangoResponse(dosimetros.size());
     }
 
+    // #7: dosímetros de una tarea (mapa de bandejas/slots con estado de armado).
+    public List<DosimetroResponse> dosimetrosDeTarea(Integer tareaId) {
+        return dosimetroRepository.findByTareaIdOrderByNumeroBandejaAscSlotBandejaAsc(tareaId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * #7 (modo preciso) — Arma una selección concreta de dosímetros: les asigna
+     * el tipo de porta indicado, validando compatibilidad con cada uno.
+     */
+    @Transactional
+    public ActualizarTipoPortaRangoResponse armarSeleccion(List<Integer> dosimetroIds, Integer tipoPortaId) {
+        TipoPorta tipoPorta = tipoPortaRepository.findById(tipoPortaId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de porta no encontrado con id: " + tipoPortaId));
+
+        List<Dosimetro> dosimetros = dosimetroRepository.findAllById(dosimetroIds);
+        for (Dosimetro d : dosimetros) {
+            if (!tipoPorta.getTipoDosimetro().getId().equals(d.getTipoDosimetro().getId())) {
+                throw new IllegalArgumentException(
+                        "El tipo de porta '" + tipoPorta.getNombre() +
+                        "' no es compatible con el dosímetro #" + d.getNumero() +
+                        " (tipo: " + d.getTipoDosimetro().getNombre() + ")");
+            }
+            d.setTipoPorta(tipoPorta);
+        }
+        dosimetroRepository.saveAll(dosimetros);
+        return new ActualizarTipoPortaRangoResponse(dosimetros.size());
+    }
+
     // --- helpers privados ---
 
     private TipoPorta resolverTipoPorta(Integer tipoPortaId, TipoDosimetro tipoDosimetro) {

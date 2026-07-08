@@ -17,6 +17,9 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
 
     List<Dosimetro> findByNumeroOrderByIdAsc(Integer numero);
 
+    // #7: dosímetros de una tarea ordenados por bandeja y slot (mapa de armado).
+    List<Dosimetro> findByTareaIdOrderByNumeroBandejaAscSlotBandejaAsc(Integer tareaId);
+
     boolean existsByNumero(Integer numero);
 
     // HU buscar: solo dosímetros que ya tienen al menos una asignación (fueron asignados)

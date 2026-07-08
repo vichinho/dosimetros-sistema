@@ -1,23 +1,64 @@
-import { useEffect, useState } from 'react'
-import { getTareas, getTiposPorta, actualizarTipoPortaRango } from '../api/endpoints'
-import { Card, Button, Input, Alert } from '../components/ui'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  getTareas,
+  getTiposPorta,
+  getDosimetrosDeTarea,
+  actualizarTipoPortaRango,
+  armarSeleccion,
+} from '../api/endpoints'
+import { Card, Button, Input, Select, Alert, Badge, Loading, EmptyState, Modal } from '../components/ui'
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
+
+// Agrupa los dosímetros de la tarea en bandejas con su estado de armado.
+// Armado = el dosímetro ya tiene tipo de porta; pendiente = sin porta.
+function agruparBandejas(dosimetros) {
+  const map = new Map()
+  for (const d of dosimetros) {
+    const banda = d.numeroBandeja ?? 0
+    if (!map.has(banda)) map.set(banda, [])
+    map.get(banda).push(d)
+  }
+  const bandejas = [...map.entries()]
+    .map(([numeroBandeja, slots]) => {
+      slots.sort((a, b) => (a.slotBandeja ?? 0) - (b.slotBandeja ?? 0))
+      const armados = slots.filter((s) => s.tipoPortaId).length
+      const pendientes = slots.length - armados
+      const portas = [...new Set(slots.filter((s) => s.tipoPortaNombre).map((s) => s.tipoPortaNombre))]
+      let estado = 'parcial'
+      if (armados === 0) estado = 'sin-armar'
+      else if (pendientes === 0) estado = 'armada'
+      return { numeroBandeja, slots, armados, pendientes, total: slots.length, portas, estado }
+    })
+    .sort((a, b) => a.numeroBandeja - b.numeroBandeja)
+  return bandejas
+}
+
+const ESTADO_BANDEJA = {
+  'sin-armar': { label: 'Sin armar', color: 'amber' },
+  parcial: { label: 'Parcial', color: 'blue' },
+  armada: { label: 'Armada', color: 'green' },
+}
 
 export default function Armar() {
   const [tareas, setTareas] = useState([])
   const [portas, setPortas] = useState([])
-  const [form, setForm] = useState({
-    tareaId: '',
-    bandejaDesde: '',
-    bandejaHasta: '',
-    slotDesde: '',
-    slotHasta: '',
-    tipoPortaId: '',
-  })
-  const [resultado, setResultado] = useState(null)
+  const [tareaId, setTareaId] = useState('')
+  const [dosimetros, setDosimetros] = useState([])
+  const [cargandoMapa, setCargandoMapa] = useState(false)
+  const [soloPendientes, setSoloPendientes] = useState(false)
+
+  // Modo rápido (por rango de bandejas)
+  const [rango, setRango] = useState({ desde: '', hasta: '', tipoPortaId: '' })
+  const [armandoRango, setArmandoRango] = useState(false)
+
+  // Modo preciso (grilla de una bandeja)
+  const [bandejaAbierta, setBandejaAbierta] = useState(null)
+  const [seleccion, setSeleccion] = useState(() => new Set())
+  const [portaPreciso, setPortaPreciso] = useState('')
+  const [armandoPreciso, setArmandoPreciso] = useState(false)
+
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
@@ -25,88 +66,293 @@ export default function Armar() {
     getTiposPorta().then(setPortas).catch(() => {})
   }, [])
 
-  const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value })
+  const cargarMapa = (id) => {
+    if (!id) {
+      setDosimetros([])
+      return
+    }
+    setCargandoMapa(true)
+    getDosimetrosDeTarea(id)
+      .then((data) => {
+        setDosimetros(data)
+        const bandas = data.map((d) => d.numeroBandeja).filter((n) => n != null)
+        if (bandas.length) {
+          setRango((r) => ({ ...r, desde: String(Math.min(...bandas)), hasta: String(Math.max(...bandas)) }))
+        }
+      })
+      .catch(() => toast.error('No se pudo cargar el mapa de la tarea'))
+      .finally(() => setCargandoMapa(false))
+  }
 
-  const handleSubmit = async (e) => {
+  const onSelectTarea = (v) => {
+    setTareaId(v)
+    setError('')
+    cargarMapa(v)
+  }
+
+  const bandejas = useMemo(() => agruparBandejas(dosimetros), [dosimetros])
+  const bandejasVisibles = soloPendientes ? bandejas.filter((b) => b.pendientes > 0) : bandejas
+
+  // Tipo de dosímetro de la tarea → portas compatibles.
+  const tipoDosimetroId = dosimetros[0]?.tipoDosimetroId
+  const portasCompat = tipoDosimetroId
+    ? portas.filter((p) => String(p.tipoDosimetroId) === String(tipoDosimetroId))
+    : portas
+
+  const totalPendientes = bandejas.reduce((a, b) => a + b.pendientes, 0)
+  const totalArmados = bandejas.reduce((a, b) => a + b.armados, 0)
+
+  const onArmarRango = async (e) => {
     e.preventDefault()
     setError('')
-    setResultado(null)
-    if (!form.tareaId) return setError('Selecciona una tarea')
-    if (!form.tipoPortaId) return setError('Selecciona el tipo de porta')
-
-    setLoading(true)
+    if (!tareaId) return setError('Selecciona una tarea')
+    if (!rango.tipoPortaId) return setError('Selecciona el tipo de porta')
+    if (!rango.desde || !rango.hasta) return setError('Indica el rango de bandejas')
+    setArmandoRango(true)
     try {
       const data = await actualizarTipoPortaRango({
-        tareaId: Number(form.tareaId),
-        bandejaDesde: Number(form.bandejaDesde),
-        bandejaHasta: Number(form.bandejaHasta),
-        slotDesde: form.slotDesde ? Number(form.slotDesde) : null,
-        slotHasta: form.slotHasta ? Number(form.slotHasta) : null,
-        tipoPortaId: Number(form.tipoPortaId),
+        tareaId: Number(tareaId),
+        bandejaDesde: Number(rango.desde),
+        bandejaHasta: Number(rango.hasta),
+        slotDesde: null,
+        slotHasta: null,
+        tipoPortaId: Number(rango.tipoPortaId),
       })
-      setResultado(data)
       toast.success(`${data.dosimetrosActualizados} dosímetros armados`)
+      cargarMapa(tareaId)
     } catch (err) {
       const msg = err.response?.data?.message || 'No se pudo armar el rango'
       setError(msg)
       toast.error(msg)
     } finally {
-      setLoading(false)
+      setArmandoRango(false)
+    }
+  }
+
+  const abrirBandeja = (bandeja) => {
+    setBandejaAbierta(bandeja)
+    setSeleccion(new Set())
+    setPortaPreciso(rango.tipoPortaId || '')
+  }
+
+  const toggleSlot = (slot) => {
+    if (slot.tipoPortaId) return // ya armado: no seleccionable
+    setSeleccion((prev) => {
+      const next = new Set(prev)
+      if (next.has(slot.id)) next.delete(slot.id)
+      else next.add(slot.id)
+      return next
+    })
+  }
+
+  const seleccionarPendientes = () => {
+    const pendientes = bandejaAbierta.slots.filter((s) => !s.tipoPortaId).map((s) => s.id)
+    setSeleccion((prev) => (prev.size === pendientes.length ? new Set() : new Set(pendientes)))
+  }
+
+  const onArmarSeleccion = async () => {
+    if (!portaPreciso) return setError('Selecciona el tipo de porta')
+    if (seleccion.size === 0) return
+    setArmandoPreciso(true)
+    try {
+      const data = await armarSeleccion({
+        dosimetroIds: [...seleccion],
+        tipoPortaId: Number(portaPreciso),
+      })
+      toast.success(`${data.dosimetrosActualizados} dosímetros armados`)
+      setBandejaAbierta(null)
+      cargarMapa(tareaId)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo armar la selección')
+    } finally {
+      setArmandoPreciso(false)
     }
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-ink">Armar dosímetros</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Asigna un tipo de porta a los dosímetros de una tarea dentro de un rango de bandeja/slot.
+          Asigna el tipo de porta a los dosímetros de una tarea. Usa el armado rápido
+          por rango de bandejas y, para bandejas incompletas, la grilla de slots.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card title="Tarea y porta">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Combobox
-              label="Tarea"
-              options={tareas.map((t) => ({ value: t.id, label: t.numeroTarea }))}
-              value={form.tareaId}
-              onChange={(v) => setForm((f) => ({ ...f, tareaId: v }))}
-              required
-            />
-            <Combobox
-              label="Tipo de porta a asignar"
-              options={portas.map((p) => ({ value: p.id, label: p.nombre }))}
-              value={form.tipoPortaId}
-              onChange={(v) => setForm((f) => ({ ...f, tipoPortaId: v }))}
-              required
-            />
+      <Card title="Tarea">
+        <div className="max-w-md">
+          <Combobox
+            label="Selecciona la tarea a armar"
+            options={tareas.map((t) => ({ value: t.id, label: t.numeroTarea }))}
+            value={tareaId}
+            onChange={onSelectTarea}
+          />
+        </div>
+      </Card>
+
+      {cargandoMapa && <Loading label="Cargando mapa de la tarea…" />}
+
+      {!cargandoMapa && tareaId && dosimetros.length === 0 && (
+        <EmptyState>La tarea no tiene dosímetros cargados.</EmptyState>
+      )}
+
+      {!cargandoMapa && dosimetros.length > 0 && (
+        <>
+          {/* Modo rápido */}
+          <Card title="Armado rápido (por rango de bandejas)">
+            <form onSubmit={onArmarRango} className="space-y-4">
+              <p className="text-sm text-slate-500">
+                Arma varias bandejas completas de una vez. Para distintos portas, haz una
+                acción por cada porta (ej. bandejas 1–10 Gringo, luego 11–15 Viejo).
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                <Input
+                  label="Bandeja desde"
+                  type="number"
+                  min="1"
+                  value={rango.desde}
+                  onChange={(e) => setRango({ ...rango, desde: e.target.value })}
+                />
+                <Input
+                  label="Bandeja hasta"
+                  type="number"
+                  min="1"
+                  value={rango.hasta}
+                  onChange={(e) => setRango({ ...rango, hasta: e.target.value })}
+                />
+                <Select
+                  label="Tipo de porta"
+                  value={rango.tipoPortaId}
+                  onChange={(e) => setRango({ ...rango, tipoPortaId: e.target.value })}
+                >
+                  <option value="">Selecciona…</option>
+                  {portasCompat.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nombre}</option>
+                  ))}
+                </Select>
+                <Button type="submit" disabled={armandoRango}>
+                  {armandoRango ? 'Armando…' : 'Armar rango'}
+                </Button>
+              </div>
+            </form>
+          </Card>
+
+          {error && <Alert type="error">{error}</Alert>}
+
+          {/* Mapa de bandejas */}
+          <Card
+            title={`Bandejas de la tarea · ${totalArmados} armados / ${totalPendientes} pendientes`}
+            action={
+              <label className="flex items-center gap-2 text-sm text-ink/70">
+                <input
+                  type="checkbox"
+                  checked={soloPendientes}
+                  onChange={(e) => setSoloPendientes(e.target.checked)}
+                />
+                Solo pendientes
+              </label>
+            }
+          >
+            {bandejasVisibles.length === 0 ? (
+              <EmptyState>No hay bandejas que mostrar.</EmptyState>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {bandejasVisibles.map((b) => {
+                  const est = ESTADO_BANDEJA[b.estado]
+                  return (
+                    <div key={b.numeroBandeja} className="border border-mist/60 rounded-xl p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-ink">Bandeja {b.numeroBandeja}</span>
+                        <Badge color={est.color}>{est.label}</Badge>
+                      </div>
+                      <p className="text-sm text-ink/70 mt-1">
+                        {b.armados}/{b.total} armados
+                        {b.pendientes > 0 && <span className="text-amber-600"> · {b.pendientes} pendientes</span>}
+                      </p>
+                      {b.portas.length > 0 && (
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">Portas: {b.portas.join(', ')}</p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => abrirBandeja(b)}
+                        className="mt-2 text-sm text-steel hover:underline"
+                      >
+                        Ver / editar slots ▸
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </Card>
+        </>
+      )}
+
+      {/* Modo preciso: grilla de slots de una bandeja */}
+      {bandejaAbierta && (
+        <Modal
+          title={`Bandeja ${bandejaAbierta.numeroBandeja} · slots`}
+          onClose={() => setBandejaAbierta(null)}
+        >
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-ink/60">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-emerald-100 border border-emerald-300 inline-block" /> pendiente (clic para seleccionar)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-steel inline-block" /> seleccionado
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3.5 h-3.5 rounded bg-mist/60 border border-mist inline-block" /> armado (bloqueado)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-1.5">
+              {bandejaAbierta.slots.map((s) => {
+                const armado = !!s.tipoPortaId
+                const sel = seleccion.has(s.id)
+                let cls = 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                if (armado) cls = 'bg-mist/50 border-mist text-ink/40 cursor-not-allowed'
+                else if (sel) cls = 'bg-steel border-steel text-white'
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    disabled={armado}
+                    onClick={() => toggleSlot(s)}
+                    title={
+                      armado
+                        ? `Slot ${s.slotBandeja} · ${s.tipoPortaNombre} (armado)`
+                        : `Slot ${s.slotBandeja} · #${s.numero} (pendiente)`
+                    }
+                    className={`aspect-square rounded border text-xs font-medium flex items-center justify-center ${cls}`}
+                  >
+                    {s.slotBandeja}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-mist/60">
+              <button type="button" onClick={seleccionarPendientes} className="text-sm text-steel hover:underline">
+                Seleccionar todos los pendientes
+              </button>
+              <div className="flex-1" />
+              <div className="w-48">
+                <Select value={portaPreciso} onChange={(e) => setPortaPreciso(e.target.value)}>
+                  <option value="">Tipo de porta…</option>
+                  {portasCompat.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nombre}</option>
+                  ))}
+                </Select>
+              </div>
+              <Button onClick={onArmarSeleccion} disabled={armandoPreciso || seleccion.size === 0}>
+                {armandoPreciso ? 'Armando…' : `Armar seleccionados (${seleccion.size})`}
+              </Button>
+            </div>
           </div>
-        </Card>
-
-        <Card title="Rango de bandeja y slot">
-          <p className="text-sm text-slate-500 mb-4">
-            La bandeja es obligatoria. El slot es opcional: déjalo vacío para abarcar toda la bandeja.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Input label="Bandeja desde" type="number" min="1" value={form.bandejaDesde} onChange={set('bandejaDesde')} required />
-            <Input label="Bandeja hasta" type="number" min="1" value={form.bandejaHasta} onChange={set('bandejaHasta')} required />
-            <Input label="Slot desde" type="number" min="1" value={form.slotDesde} onChange={set('slotDesde')} />
-            <Input label="Slot hasta" type="number" min="1" value={form.slotHasta} onChange={set('slotHasta')} />
-          </div>
-        </Card>
-
-        <Alert type="error">{error}</Alert>
-        {resultado && (
-          <Alert type="success">
-            Se armaron {resultado.dosimetrosActualizados} dosímetros con el porta seleccionado.
-          </Alert>
-        )}
-
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Armando…' : 'Armar dosímetros'}
-        </Button>
-      </form>
+        </Modal>
+      )}
     </div>
   )
 }
