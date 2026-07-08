@@ -10,8 +10,14 @@ import { Card, Button, Input, Select, Alert, Badge, Loading, EmptyState, Modal }
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 
+// Un dosímetro está pendiente de armar si no tiene porta o si su porta es una
+// "Sin armar (…)". Armado = tiene una porta real.
+function esPendiente(d) {
+  if (!d.tipoPortaId) return true
+  return (d.tipoPortaNombre || '').toLowerCase().startsWith('sin armar')
+}
+
 // Agrupa los dosímetros de la tarea en bandejas con su estado de armado.
-// Armado = el dosímetro ya tiene tipo de porta; pendiente = sin porta.
 function agruparBandejas(dosimetros) {
   const map = new Map()
   for (const d of dosimetros) {
@@ -22,9 +28,10 @@ function agruparBandejas(dosimetros) {
   const bandejas = [...map.entries()]
     .map(([numeroBandeja, slots]) => {
       slots.sort((a, b) => (a.slotBandeja ?? 0) - (b.slotBandeja ?? 0))
-      const armados = slots.filter((s) => s.tipoPortaId).length
-      const pendientes = slots.length - armados
-      const portas = [...new Set(slots.filter((s) => s.tipoPortaNombre).map((s) => s.tipoPortaNombre))]
+      const pendientes = slots.filter(esPendiente).length
+      const armados = slots.length - pendientes
+      // Solo portas reales (excluye las "Sin armar").
+      const portas = [...new Set(slots.filter((s) => !esPendiente(s)).map((s) => s.tipoPortaNombre))]
       let estado = 'parcial'
       if (armados === 0) estado = 'sin-armar'
       else if (pendientes === 0) estado = 'armada'
@@ -95,9 +102,10 @@ export default function Armar() {
 
   // Tipo de dosímetro de la tarea → portas compatibles.
   const tipoDosimetroId = dosimetros[0]?.tipoDosimetroId
-  const portasCompat = tipoDosimetroId
+  const portasCompat = (tipoDosimetroId
     ? portas.filter((p) => String(p.tipoDosimetroId) === String(tipoDosimetroId))
     : portas
+  ).filter((p) => !(p.nombre || '').toLowerCase().startsWith('sin armar'))
 
   const totalPendientes = bandejas.reduce((a, b) => a + b.pendientes, 0)
   const totalArmados = bandejas.reduce((a, b) => a + b.armados, 0)
@@ -136,7 +144,7 @@ export default function Armar() {
   }
 
   const toggleSlot = (slot) => {
-    if (slot.tipoPortaId) return // ya armado: no seleccionable
+    if (!esPendiente(slot)) return // ya armado: no seleccionable
     setSeleccion((prev) => {
       const next = new Set(prev)
       if (next.has(slot.id)) next.delete(slot.id)
@@ -146,7 +154,7 @@ export default function Armar() {
   }
 
   const seleccionarPendientes = () => {
-    const pendientes = bandejaAbierta.slots.filter((s) => !s.tipoPortaId).map((s) => s.id)
+    const pendientes = bandejaAbierta.slots.filter(esPendiente).map((s) => s.id)
     setSeleccion((prev) => (prev.size === pendientes.length ? new Set() : new Set(pendientes)))
   }
 
@@ -309,7 +317,7 @@ export default function Armar() {
 
             <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-1.5">
               {bandejaAbierta.slots.map((s) => {
-                const armado = !!s.tipoPortaId
+                const armado = !esPendiente(s)
                 const sel = seleccion.has(s.id)
                 let cls = 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
                 if (armado) cls = 'bg-mist/50 border-mist text-ink/40 cursor-not-allowed'
