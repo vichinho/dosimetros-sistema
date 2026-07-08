@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -127,4 +128,27 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
         ORDER BY td.nombre ASC, COUNT(d) DESC
     """)
     List<Object[]> detallePortasDisponibles();
+
+    // --- Stock histórico: dosímetros existentes a una fecha (por creación) ---
+
+    @Query("SELECT COUNT(d) FROM Dosimetro d WHERE d.fechaCreacion <= :fecha")
+    long contarCreadosHasta(@Param("fecha") LocalDate fecha);
+
+    @Query("""
+        SELECT tp.id, tp.nombre, COUNT(d)
+        FROM Dosimetro d JOIN d.tipoPorta tp
+        WHERE d.fechaCreacion <= :fecha
+        GROUP BY tp.id, tp.nombre
+        ORDER BY COUNT(d) DESC
+    """)
+    List<Object[]> contarPorPortaHasta(@Param("fecha") LocalDate fecha);
+
+    @Query("""
+        SELECT t.id, t.nombre, COUNT(d)
+        FROM Dosimetro d JOIN d.tipoDosimetro t
+        WHERE d.fechaCreacion <= :fecha
+        GROUP BY t.id, t.nombre
+        ORDER BY t.nombre
+    """)
+    List<Object[]> contarPorTipoHasta(@Param("fecha") LocalDate fecha);
 }

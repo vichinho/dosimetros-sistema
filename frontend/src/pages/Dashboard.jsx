@@ -14,9 +14,24 @@ import {
   Legend,
   Cell,
 } from 'recharts'
-import { getKpis } from '../api/endpoints'
-import { Card, Loading, Alert, EmptyState, Select, Modal, Badge } from '../components/ui'
+import { getKpis, getStockHistorico } from '../api/endpoints'
+import { Card, Loading, Alert, EmptyState, Select, Input, Modal, Badge, Spinner } from '../components/ui'
 import { useToast } from '../components/Toast'
+
+// Trimestre en formato 'QTYYYY' (ej. 2T2025) → rango de meses legible.
+const MESES_TRIMESTRE = {
+  1: 'ene–mar',
+  2: 'abr–jun',
+  3: 'jul–sep',
+  4: 'oct–dic',
+}
+function mesesDeTrimestre(t) {
+  if (!t || t.length < 6) return ''
+  const q = Number(t[0])
+  const anio = t.slice(2)
+  const meses = MESES_TRIMESTRE[q]
+  return meses ? `${meses} ${anio}` : ''
+}
 
 // Barras de una sola serie: un solo tono (magnitud). La dona (identidad) usa varios.
 const BAR_FILL = '#5b7065'
@@ -125,6 +140,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [drill, setDrill] = useState(null)
+  // #4 Stock histórico por fecha de creación
+  const hoy = new Date().toISOString().slice(0, 10)
+  const [histFecha, setHistFecha] = useState(hoy)
+  const [hist, setHist] = useState(null)
+  const [histLoading, setHistLoading] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
@@ -139,10 +159,22 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimestre])
 
+  useEffect(() => {
+    if (!histFecha) return
+    setHistLoading(true)
+    getStockHistorico(histFecha)
+      .then(setHist)
+      .catch(() => toast.error('No se pudo cargar el stock histórico'))
+      .finally(() => setHistLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [histFecha])
+
   if (loading && !kpis) return <Loading label="Cargando dashboard…" />
 
   const sufijo = trimestre ? ` · ${trimestre}` : ''
+  const meses = mesesDeTrimestre(trimestre)
   const k = kpis || {}
+  const actualizando = loading && kpis // recarga tras cambiar el trimestre
 
   // Contenido de cada drill-down (reutiliza los datos ya cargados)
   const DRILL = {
@@ -222,6 +254,21 @@ export default function Dashboard() {
           <p className="text-sm text-slate-500 mt-0.5">
             Resumen de stock y asignaciones · toca un indicador para ver el detalle
           </p>
+          <div className="flex items-center gap-2 mt-2">
+            {trimestre ? (
+              <Badge color="blue">
+                Asignaciones: {trimestre}
+                {meses ? ` · ${meses}` : ''}
+              </Badge>
+            ) : (
+              <Badge color="slate">Asignaciones: todos los trimestres</Badge>
+            )}
+            {actualizando && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-ink/50">
+                <Spinner className="w-3.5 h-3.5" /> actualizando…
+              </span>
+            )}
+          </div>
         </div>
         <div className="w-full sm:w-56">
           <Select
@@ -231,7 +278,10 @@ export default function Dashboard() {
           >
             <option value="">Todos los trimestres</option>
             {k.trimestresDisponibles?.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>
+                {t}
+                {mesesDeTrimestre(t) ? ` (${mesesDeTrimestre(t)})` : ''}
+              </option>
             ))}
           </Select>
         </div>
@@ -324,6 +374,51 @@ export default function Dashboard() {
             <BarPanel title={`Asignaciones por ejecutivo${sufijo}`} data={k.asignacionesPorEjecutivo} horizontal />
             <BarPanel title={`Top 3 clientes${sufijo}`} data={top3} horizontal />
           </div>
+
+          {/* #4 Stock histórico por fecha de creación */}
+          <Card
+            title="Stock histórico por fecha"
+            action={
+              <div className="flex items-center gap-2">
+                {histLoading && <Spinner className="w-4 h-4" />}
+                <div className="w-44">
+                  <Input
+                    type="date"
+                    max={hoy}
+                    value={histFecha}
+                    onChange={(e) => setHistFecha(e.target.value)}
+                  />
+                </div>
+              </div>
+            }
+          >
+            <p className="text-sm text-ink/60 mb-4">
+              Dosímetros que ya existían en el inventario a la fecha elegida, según
+              su fecha de creación (no por asignación).
+            </p>
+            {hist ? (
+              <div className="space-y-6">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-ink">{hist.total}</span>
+                  <span className="text-sm text-ink/60">
+                    dosímetros existían al {hist.fecha}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-sm font-semibold text-ink mb-2">Por tipo de porta</h4>
+                    <ConteoTabla filas={hist.porTipoPorta} etiqueta="Porta" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-ink mb-2">Por tipo de dosímetro</h4>
+                    <ConteoTabla filas={hist.porTipoDosimetro} etiqueta="Tipo" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <EmptyState>Elige una fecha para ver el stock histórico</EmptyState>
+            )}
+          </Card>
         </>
       )}
 
