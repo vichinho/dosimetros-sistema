@@ -46,8 +46,9 @@ public class DosimetroController {
     public ResponseEntity<List<DosimetroResponse>> filtrarStock(
             @RequestParam(required = false) Integer tipoDosimetroId,
             @RequestParam(required = false) Integer tipoPortaId,
+            @RequestParam(required = false) Integer tareaId,
             @RequestParam(required = false) String estado) {
-        return ResponseEntity.ok(service.filtrarStock(tipoDosimetroId, tipoPortaId, estado));
+        return ResponseEntity.ok(service.filtrarStock(tipoDosimetroId, tipoPortaId, tareaId, estado));
     }
 
     @GetMapping("/buscar")

@@ -11,7 +11,7 @@ import {
   marcarBueno,
   liberarDosimetro,
 } from '../api/endpoints'
-import { Card, Select, Badge, Button, Loading, EmptyState, Pagination, Alert } from '../components/ui'
+import { Card, Select, Badge, Button, Loading, EmptyState, Pagination, Alert, Modal } from '../components/ui'
 import { useToast } from '../components/Toast'
 
 const estadoColor = { disponible: 'green', asignado: 'blue', baja: 'red', dañado: 'amber' }
@@ -60,6 +60,10 @@ export default function Stock() {
   const [detallePortas, setDetallePortas] = useState([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
+  // Drill-down de la matriz: detalle de dosímetros de una tarea (opcional: porta)
+  const [drill, setDrill] = useState(null) // { numeroTarea, portaNombre }
+  const [drillData, setDrillData] = useState([])
+  const [drillLoading, setDrillLoading] = useState(false)
   // #8 Actualización de stock por archivo (upsert)
   const [archivo, setArchivo] = useState(null)
   const [subiendo, setSubiendo] = useState(false)
@@ -121,6 +125,20 @@ export default function Stock() {
   }
 
   const recargarDetalle = () => getStockPortas().then(setDetallePortas).catch(() => {})
+
+  // Abre el detalle de dosímetros de una tarea (opcionalmente acotado a una porta).
+  const abrirDrill = (fila, col) => {
+    setDrill({ numeroTarea: fila.numeroTarea, portaNombre: col?.nombre || null })
+    setDrillLoading(true)
+    const params = { tareaId: fila.tareaId }
+    if (filtros.tipoDosimetroId) params.tipoDosimetroId = filtros.tipoDosimetroId
+    if (filtros.estado) params.estado = filtros.estado
+    if (col) params.tipoPortaId = col.id
+    getStock(params)
+      .then(setDrillData)
+      .catch(() => toast.error('No se pudo cargar el detalle de la tarea'))
+      .finally(() => setDrillLoading(false))
+  }
 
   const onActualizarArchivo = async (e) => {
     e.preventDefault()
@@ -329,11 +347,31 @@ export default function Stock() {
                   </thead>
                   <tbody>
                     {pivot.filas.map((f) => (
-                      <tr key={f.tareaId} className="border-b border-slate-100">
-                        <td className="py-2 pr-4 font-medium text-ink sticky left-0 bg-white">{f.numeroTarea}</td>
+                      <tr key={f.tareaId} className="border-b border-slate-100 hover:bg-mist/10">
+                        <td className="py-2 pr-4 font-medium sticky left-0 bg-white">
+                          <button
+                            type="button"
+                            onClick={() => abrirDrill(f)}
+                            className="text-steel hover:underline"
+                            title="Ver dosímetros de la tarea"
+                          >
+                            {f.numeroTarea}
+                          </button>
+                        </td>
                         {pivot.columnas.map((c) => (
                           <td key={c.id} className="py-2 px-3 text-right text-slate-600">
-                            {f.celdas[c.id] ? f.celdas[c.id] : <span className="text-slate-300">·</span>}
+                            {f.celdas[c.id] ? (
+                              <button
+                                type="button"
+                                onClick={() => abrirDrill(f, c)}
+                                className="hover:underline hover:text-steel"
+                                title={`Ver ${c.nombre} de la tarea ${f.numeroTarea}`}
+                              >
+                                {f.celdas[c.id]}
+                              </button>
+                            ) : (
+                              <span className="text-slate-300">·</span>
+                            )}
                           </td>
                         ))}
                         <td className="py-2 pl-3 text-right font-semibold text-ink">{f.total}</td>
@@ -420,6 +458,50 @@ export default function Stock() {
             </div>
           )}
         </Card>
+      )}
+
+      {/* Detalle de dosímetros de una tarea (drill-down de la matriz) */}
+      {drill && (
+        <Modal
+          title={`Tarea ${drill.numeroTarea}${drill.portaNombre ? ` · ${drill.portaNombre}` : ''}`}
+          onClose={() => setDrill(null)}
+        >
+          {drillLoading ? (
+            <Loading />
+          ) : drillData.length === 0 ? (
+            <EmptyState>Sin dosímetros con esos filtros</EmptyState>
+          ) : (
+            <div className="overflow-x-auto">
+              <p className="text-sm text-ink/60 mb-3">{drillData.length} dosímetros</p>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b border-slate-200">
+                    <th className="py-2 font-medium">Número</th>
+                    <th className="py-2 font-medium">Tipo</th>
+                    <th className="py-2 font-medium">Porta</th>
+                    <th className="py-2 font-medium">Bandeja/Slot</th>
+                    <th className="py-2 font-medium">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drillData.map((d) => (
+                    <tr key={d.id} className="border-b border-slate-100">
+                      <td className="py-2 font-medium text-ink">{d.numero}</td>
+                      <td className="py-2 text-slate-600">{d.tipoDosimetroNombre}</td>
+                      <td className="py-2 text-slate-600">{d.tipoPortaNombre || <span className="text-slate-400">—</span>}</td>
+                      <td className="py-2 text-slate-600">
+                        {d.numeroBandeja != null ? `${d.numeroBandeja} / ${d.slotBandeja}` : '—'}
+                      </td>
+                      <td className="py-2">
+                        <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   )

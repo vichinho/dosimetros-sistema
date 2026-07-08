@@ -66,10 +66,12 @@ public class DosimetroService {
     }
 
     // HU #7: stock filtrado por tipo de dosímetro, estado de armado (tipo de
-    // porta, incluida "sin armar") y estado del dosímetro.
-    public List<DosimetroResponse> filtrarStock(Integer tipoDosimetroId, Integer tipoPortaId, String estado) {
-        String estadoFinal = (estado == null || estado.isBlank()) ? "disponible" : estado;
-        return dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, estadoFinal)
+    // porta, incluida "sin armar"), tarea y estado del dosímetro.
+    public List<DosimetroResponse> filtrarStock(Integer tipoDosimetroId, Integer tipoPortaId,
+                                                Integer tareaId, String estado) {
+        // Estado en blanco = todos los estados (coincide con la matriz de #6).
+        String estadoFinal = (estado == null || estado.isBlank()) ? null : estado;
+        return dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, tareaId, estadoFinal)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -110,7 +112,7 @@ public class DosimetroService {
     // Exporta el stock filtrado a un archivo Excel (.xlsx).
     public byte[] exportarStockExcel(Integer tipoDosimetroId, Integer tipoPortaId, String estado) {
         String estadoFinal = (estado == null || estado.isBlank()) ? null : estado;
-        List<Dosimetro> dosimetros = dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, estadoFinal);
+        List<Dosimetro> dosimetros = dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, null, estadoFinal);
 
         try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("Stock");
