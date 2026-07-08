@@ -31,6 +31,10 @@ export const getTareasDisponibles = (tipoDosimetroId) =>
 // --- Dashboard ---
 export const getKpis = (trimestre) =>
   client.get('/dashboard/kpis', { params: trimestre ? { trimestre } : {} }).then((r) => r.data)
+export const getStockHistorico = (fecha) =>
+  client
+    .get('/dashboard/stock-historico', { params: fecha ? { fecha } : {} })
+    .then((r) => r.data)
 
 // --- Dosímetros ---
 export const getStock = (params) =>

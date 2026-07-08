@@ -3,10 +3,12 @@ package com.dosimetros.backend.service;
 import com.dosimetros.backend.dto.dashboard.ConteoClaveResponse;
 import com.dosimetros.backend.dto.dashboard.ConteoResponse;
 import com.dosimetros.backend.dto.dashboard.DashboardKpisResponse;
+import com.dosimetros.backend.dto.dashboard.StockHistoricoResponse;
 import com.dosimetros.backend.repository.AsignacionRepository;
 import com.dosimetros.backend.repository.DosimetroRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -53,6 +55,20 @@ public class DashboardService {
         kpis.setAsignacionesPorTrimestre(mapearClave(asignacionRepository.contarPorTrimestre()));
 
         return kpis;
+    }
+
+    /**
+     * Stock del inventario a una fecha pasada: cuántos dosímetros existían
+     * (habían sido creados) en o antes de esa fecha, desglosado por tipo de
+     * porta y por tipo de dosímetro.
+     */
+    public StockHistoricoResponse stockHistorico(LocalDate fecha) {
+        LocalDate f = (fecha == null) ? LocalDate.now() : fecha;
+        return new StockHistoricoResponse(
+                f,
+                dosimetroRepository.contarCreadosHasta(f),
+                mapearConteo(dosimetroRepository.contarPorPortaHasta(f)),
+                mapearConteo(dosimetroRepository.contarPorTipoHasta(f)));
     }
 
     private long contarEstado(List<ConteoClaveResponse> porEstado, String estado) {

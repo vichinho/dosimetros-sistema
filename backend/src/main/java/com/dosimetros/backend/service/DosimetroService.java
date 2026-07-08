@@ -165,6 +165,8 @@ public class DosimetroService {
         dosimetro.setSlotBandeja(request.getSlotBandeja());
         dosimetro.setEstado(request.getEstado() != null ? request.getEstado() : "disponible");
         dosimetro.setObservacion(request.getObservacion());
+        dosimetro.setFechaCreacion(
+                tarea != null ? tarea.getFechaCreacion() : java.time.LocalDate.now());
 
         return toResponse(dosimetroRepository.save(dosimetro));
     }

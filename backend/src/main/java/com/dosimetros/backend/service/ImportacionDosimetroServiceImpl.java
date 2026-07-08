@@ -192,6 +192,9 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                     dosimetro.setNumeroBandeja(numeroBandeja);
                     dosimetro.setSlotBandeja(slotBandeja);
                     dosimetro.setEstado("disponible");
+                    // Entran al inventario con la fecha de creación de su tarea.
+                    dosimetro.setFechaCreacion(
+                            tarea != null ? tarea.getFechaCreacion() : java.time.LocalDate.now());
 
                     dosimetroRepository.save(dosimetro);
                     exitosas++;
