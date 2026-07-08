@@ -7,6 +7,7 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
+import com.dosimetros.backend.dto.dosimetro.MatrizCeldaResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
 import com.dosimetros.backend.dto.tarea.TareaDisponibleResponse;
 import org.apache.poi.ss.usermodel.Cell;
@@ -86,6 +87,23 @@ public class DosimetroService {
         return dosimetroRepository.detallePortasDisponibles().stream()
                 .map(o -> new PortaDisponibleResponse(
                         (Integer) o[0], (String) o[1], (String) o[2], (Long) o[3]))
+                .toList();
+    }
+
+    // #5: TODAS las portas con su stock disponible, incluidas las que están en 0.
+    public List<PortaDisponibleResponse> stockTodasLasPortas() {
+        return dosimetroRepository.stockTodasLasPortas().stream()
+                .map(o -> new PortaDisponibleResponse(
+                        (Integer) o[0], (String) o[1], (String) o[2], (Long) o[3]))
+                .toList();
+    }
+
+    // #6: matriz tarea × porta para la vista dinámica de stock.
+    public List<MatrizCeldaResponse> matrizTareaPorta(Integer tipoDosimetroId, String estado) {
+        String estadoFinal = (estado == null || estado.isBlank()) ? null : estado;
+        return dosimetroRepository.matrizTareaPorta(estadoFinal, tipoDosimetroId).stream()
+                .map(o -> new MatrizCeldaResponse(
+                        (Integer) o[0], (String) o[1], (Integer) o[2], (String) o[3], (Long) o[4]))
                 .toList();
     }
 

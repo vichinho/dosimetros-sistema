@@ -7,6 +7,7 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
+import com.dosimetros.backend.dto.dosimetro.MatrizCeldaResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
 import com.dosimetros.backend.dto.tarea.TareaDisponibleResponse;
 import org.springframework.http.HttpHeaders;
@@ -65,6 +66,22 @@ public class DosimetroController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<PortaDisponibleResponse>> portasDisponibles() {
         return ResponseEntity.ok(service.detallePortasDisponibles());
+    }
+
+    // #5: todas las portas, incluidas las que están en 0.
+    @GetMapping("/stock/portas")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<PortaDisponibleResponse>> stockTodasLasPortas() {
+        return ResponseEntity.ok(service.stockTodasLasPortas());
+    }
+
+    // #6: matriz tarea × porta para la vista dinámica.
+    @GetMapping("/stock/matriz")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<MatrizCeldaResponse>> stockMatriz(
+            @RequestParam(required = false) Integer tipoDosimetroId,
+            @RequestParam(required = false) String estado) {
+        return ResponseEntity.ok(service.matrizTareaPorta(tipoDosimetroId, estado));
     }
 
     @GetMapping("/tareas-disponibles")

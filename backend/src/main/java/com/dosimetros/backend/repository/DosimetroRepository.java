@@ -129,6 +129,31 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
     """)
     List<Object[]> detallePortasDisponibles();
 
+    // #5: TODAS las portas con su stock disponible, incluidas las que están en 0.
+    @Query("""
+        SELECT tp.id, tp.nombre, td.nombre,
+               COUNT(d.id)
+        FROM TipoPorta tp JOIN tp.tipoDosimetro td
+        LEFT JOIN Dosimetro d ON d.tipoPorta.id = tp.id AND d.estado = 'disponible'
+        GROUP BY tp.id, tp.nombre, td.nombre
+        ORDER BY td.nombre ASC, tp.nombre ASC
+    """)
+    List<Object[]> stockTodasLasPortas();
+
+    // #6: matriz tarea × tipo de porta (conteo por celda) para la vista dinámica.
+    // Solo dosímetros armados (con tarea y porta); filtrable por estado y tipo.
+    @Query("""
+        SELECT t.id, t.numeroTarea, tp.id, tp.nombre, COUNT(d)
+        FROM Dosimetro d JOIN d.tarea t JOIN d.tipoPorta tp
+        WHERE (:estado IS NULL OR d.estado = :estado)
+          AND (:tipoDosimetroId IS NULL OR d.tipoDosimetro.id = :tipoDosimetroId)
+        GROUP BY t.id, t.numeroTarea, tp.id, tp.nombre
+        ORDER BY t.numeroTarea ASC, tp.nombre ASC
+    """)
+    List<Object[]> matrizTareaPorta(
+            @Param("estado") String estado,
+            @Param("tipoDosimetroId") Integer tipoDosimetroId);
+
     // --- Stock histórico: dosímetros existentes a una fecha (por creación) ---
 
     @Query("SELECT COUNT(d) FROM Dosimetro d WHERE d.fechaCreacion <= :fecha")

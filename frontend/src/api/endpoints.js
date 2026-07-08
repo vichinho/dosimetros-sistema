@@ -42,6 +42,10 @@ export const getStock = (params) =>
 export const getDisponibles = () => client.get('/dosimetros/disponibles').then((r) => r.data)
 export const getPortasDisponibles = () =>
   client.get('/dosimetros/disponibles/portas').then((r) => r.data)
+export const getStockPortas = () =>
+  client.get('/dosimetros/stock/portas').then((r) => r.data)
+export const getStockMatriz = (params) =>
+  client.get('/dosimetros/stock/matriz', { params }).then((r) => r.data)
 export const exportarStockExcel = (params) =>
   client.get('/dosimetros/stock/export', { params, responseType: 'blob' }).then((r) => r.data)
 export const buscarDosimetro = (numero) =>
