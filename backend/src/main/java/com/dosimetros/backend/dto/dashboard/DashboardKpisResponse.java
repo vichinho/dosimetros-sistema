@@ -31,6 +31,8 @@ public class DashboardKpisResponse {
     private List<ConteoResponse> asignacionesPorTipoPorta;
     private List<ConteoResponse> topClientes;
     private List<ConteoClaveResponse> asignacionesPorTrimestre;
+    // Asignaciones por mes del trimestre filtrado (null si no hay filtro)
+    private List<ConteoClaveResponse> asignacionesPorMes;
 
     public DashboardKpisResponse() {
     }
@@ -161,5 +163,13 @@ public class DashboardKpisResponse {
 
     public void setAsignacionesPorTrimestre(List<ConteoClaveResponse> asignacionesPorTrimestre) {
         this.asignacionesPorTrimestre = asignacionesPorTrimestre;
+    }
+
+    public List<ConteoClaveResponse> getAsignacionesPorMes() {
+        return asignacionesPorMes;
+    }
+
+    public void setAsignacionesPorMes(List<ConteoClaveResponse> asignacionesPorMes) {
+        this.asignacionesPorMes = asignacionesPorMes;
     }
 }

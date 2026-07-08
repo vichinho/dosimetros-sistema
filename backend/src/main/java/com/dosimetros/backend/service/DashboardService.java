@@ -53,8 +53,51 @@ public class DashboardService {
         kpis.setTopClientes(mapearConteo(asignacionRepository.contarPorCliente(filtro)));
         // La evolución por trimestre siempre muestra todos los trimestres.
         kpis.setAsignacionesPorTrimestre(mapearClave(asignacionRepository.contarPorTrimestre()));
+        // Con un trimestre filtrado, además el desglose por mes de ese trimestre.
+        if (filtro != null) {
+            kpis.setAsignacionesPorMes(asignacionesPorMes(filtro));
+        }
 
         return kpis;
+    }
+
+    // Nombres de meses (índice 1-12) para el desglose por mes.
+    private static final String[] MESES = {
+            "", "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+            "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
+    };
+
+    /**
+     * Desglosa las asignaciones de un trimestre por sus 3 meses, rellenando
+     * con cero los meses sin asignaciones. Formato del trimestre: 'QTYYYY'.
+     */
+    private List<ConteoClaveResponse> asignacionesPorMes(String trimestre) {
+        java.util.Map<Integer, Long> conteos = new java.util.HashMap<>();
+        for (Object[] o : asignacionRepository.contarPorMesEnTrimestre(trimestre)) {
+            conteos.put(((Number) o[0]).intValue(), ((Number) o[1]).longValue());
+        }
+        int mesBase = mesBaseDeTrimestre(trimestre);
+        if (mesBase == 0) {
+            return List.of();
+        }
+        List<ConteoClaveResponse> filas = new java.util.ArrayList<>(3);
+        for (int i = 0; i < 3; i++) {
+            int mes = mesBase + i;
+            filas.add(new ConteoClaveResponse(MESES[mes], conteos.getOrDefault(mes, 0L)));
+        }
+        return filas;
+    }
+
+    // Primer mes del trimestre (1,4,7,10) a partir de 'QTYYYY'; 0 si no es válido.
+    private int mesBaseDeTrimestre(String trimestre) {
+        if (trimestre == null || trimestre.length() < 6) {
+            return 0;
+        }
+        int q = Character.getNumericValue(trimestre.charAt(0));
+        if (q < 1 || q > 4) {
+            return 0;
+        }
+        return (q - 1) * 3 + 1;
     }
 
     /**
