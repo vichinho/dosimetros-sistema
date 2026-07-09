@@ -6,8 +6,10 @@ import {
   marcarEnvioAsignaciones,
   getEjecutivos,
 } from '../api/endpoints'
-import { Card, Select, Button, Badge, Loading, EmptyState } from '../components/ui'
+import { Card, Select, Input, Button, Badge, Loading, EmptyState, Pagination } from '../components/ui'
 import { useToast } from '../components/Toast'
+
+const POR_PAGINA = 10
 
 // Orden fino en el cliente (botoneras).
 const CAMPOS_ORDEN = [
@@ -22,24 +24,29 @@ export default function PendienteEnvio() {
   const esEjecutivo = rol === 'EJECUTIVO'
   const toast = useToast()
 
+  const [tab, setTab] = useState('pendientes') // 'pendientes' | 'enviados'
   const [asignaciones, setAsignaciones] = useState([])
   const [ejecutivos, setEjecutivos] = useState([])
   const [ejecutivoId, setEjecutivoId] = useState('')
   const [trimestresSel, setTrimestresSel] = useState(() => new Set()) // vacío = todos
+  const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState({ campo: 'trimestre', dir: 'desc' })
   const [seleccion, setSeleccion] = useState(() => new Set())
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [marcando, setMarcando] = useState(false)
+
+  const enviadosTab = tab === 'enviados'
 
   const cargar = () => {
     setLoading(true)
     setSeleccion(new Set())
     const fetcher = esEjecutivo ? getMisPendientesEnvio : getPendientesEnvio
-    const params = {}
+    const params = { enviado: enviadosTab }
     if (!esEjecutivo && ejecutivoId) params.ejecutivoId = ejecutivoId
     fetcher(params)
       .then(setAsignaciones)
-      .catch(() => toast.error('No se pudieron cargar las asignaciones pendientes'))
+      .catch(() => toast.error('No se pudieron cargar las asignaciones'))
       .finally(() => setLoading(false))
   }
 
@@ -47,7 +54,7 @@ export default function PendienteEnvio() {
     if (!esEjecutivo) getEjecutivos().then(setEjecutivos).catch(() => {})
     cargar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ejecutivoId])
+  }, [ejecutivoId, tab])
 
   // Trimestres disponibles en los datos, para el filtro configurable.
   const trimestresDisponibles = useMemo(
@@ -64,6 +71,8 @@ export default function PendienteEnvio() {
   const filtradas = useMemo(() => {
     let lista = asignaciones
     if (trimestresSel.size > 0) lista = lista.filter((a) => trimestresSel.has(a.trimestre))
+    const q = busqueda.trim()
+    if (q) lista = lista.filter((a) => String(a.numeroDosimetro).includes(q))
     const dir = orden.dir === 'asc' ? 1 : -1
     return [...lista].sort((x, y) => {
       const a = x[orden.campo], b = y[orden.campo]
@@ -73,7 +82,13 @@ export default function PendienteEnvio() {
       if (a > b) return 1 * dir
       return 0
     })
-  }, [asignaciones, trimestresSel, orden])
+  }, [asignaciones, trimestresSel, busqueda, orden])
+
+  // Reinicia la página cuando cambian filtros, orden o pestaña.
+  useEffect(() => { setPage(1) }, [trimestresSel, busqueda, orden, tab, ejecutivoId])
+
+  const totalPages = Math.ceil(filtradas.length / POR_PAGINA)
+  const visibles = filtradas.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
 
   const ordenarPor = (campo) =>
     setOrden((o) => (o.campo === campo ? { campo, dir: o.dir === 'asc' ? 'desc' : 'asc' } : { campo, dir: 'asc' }))
@@ -86,15 +101,16 @@ export default function PendienteEnvio() {
   const toggleTodos = () =>
     setSeleccion((prev) => (prev.size === filtradas.length ? new Set() : new Set(filtradas.map((a) => a.id))))
 
-  const marcarEnviado = async () => {
+  const cambiarEnvio = async () => {
     if (seleccion.size === 0) return
     setMarcando(true)
+    const nuevoEnviado = !enviadosTab // en "pendientes" -> enviar; en "enviados" -> revertir
     try {
-      const n = await marcarEnvioAsignaciones({ asignacionIds: [...seleccion], enviado: true })
-      toast.success(`${n} asignaciones marcadas como enviadas`)
+      const n = await marcarEnvioAsignaciones({ asignacionIds: [...seleccion], enviado: nuevoEnviado })
+      toast.success(nuevoEnviado ? `${n} asignaciones marcadas como enviadas` : `${n} asignaciones devueltas a pendiente`)
       cargar()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'No se pudo marcar el envío')
+      toast.error(err.response?.data?.message || 'No se pudo actualizar el envío')
     } finally {
       setMarcando(false)
     }
@@ -111,8 +127,33 @@ export default function PendienteEnvio() {
         </p>
       </div>
 
+      <div className="inline-flex rounded-lg border border-mist overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setTab('pendientes')}
+          className={`px-4 py-1.5 text-sm ${!enviadosTab ? 'bg-steel text-white' : 'bg-white text-ink/70 hover:bg-mist/20'}`}
+        >
+          Pendientes
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('enviados')}
+          className={`px-4 py-1.5 text-sm ${enviadosTab ? 'bg-steel text-white' : 'bg-white text-ink/70 hover:bg-mist/20'}`}
+        >
+          Enviados
+        </button>
+      </div>
+
       <Card title="Filtros">
         <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Buscar por N° de dosímetro"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Ej: 12345"
+            />
+          </div>
           {!esEjecutivo && (
             <div className="max-w-xs">
               <Select label="Ejecutivo" value={ejecutivoId} onChange={(e) => setEjecutivoId(e.target.value)}>
@@ -165,11 +206,15 @@ export default function PendienteEnvio() {
       </Card>
 
       <Card
-        title={`Pendientes (${filtradas.length})`}
+        title={`${enviadosTab ? 'Enviados' : 'Pendientes'} (${filtradas.length})`}
         action={
           !esEjecutivo && (
-            <Button onClick={marcarEnviado} disabled={marcando || seleccion.size === 0}>
-              {marcando ? 'Marcando…' : `Marcar como enviado (${seleccion.size})`}
+            <Button onClick={cambiarEnvio} disabled={marcando || seleccion.size === 0}>
+              {marcando
+                ? 'Guardando…'
+                : enviadosTab
+                  ? `Revertir a pendiente (${seleccion.size})`
+                  : `Marcar como enviado (${seleccion.size})`}
             </Button>
           )
         }
@@ -194,13 +239,14 @@ export default function PendienteEnvio() {
                   <th className="py-2 font-medium">Empresa</th>
                   <th className="py-2 font-medium">Trimestre</th>
                   <th className="py-2 font-medium">Fecha asig.</th>
+                  {enviadosTab && <th className="py-2 font-medium">Fecha envío</th>}
                   <th className="py-2 font-medium">Porta</th>
                   <th className="py-2 font-medium">Tarea</th>
                   <th className="py-2 font-medium">Trello</th>
                 </tr>
               </thead>
               <tbody>
-                {filtradas.map((a) => (
+                {visibles.map((a) => (
                   <tr key={a.id} className={`border-b border-slate-100 ${seleccion.has(a.id) ? 'bg-steel/5' : ''}`}>
                     {!esEjecutivo && (
                       <td className="py-2"><input type="checkbox" checked={seleccion.has(a.id)} onChange={() => toggleSel(a.id)} /></td>
@@ -211,6 +257,7 @@ export default function PendienteEnvio() {
                     <td className="py-2 text-slate-600">{a.empresaNombre}</td>
                     <td className="py-2"><Badge color="blue">{a.trimestre}</Badge></td>
                     <td className="py-2 text-slate-600">{a.fechaAsignacion}</td>
+                    {enviadosTab && <td className="py-2 text-slate-600">{a.fechaEnvio || '—'}</td>}
                     <td className="py-2 text-slate-600">{a.tipoPortaNombre}</td>
                     <td className="py-2 text-slate-600">{a.numeroTarea || '—'}</td>
                     <td className="py-2 text-slate-600">
@@ -220,6 +267,7 @@ export default function PendienteEnvio() {
                 ))}
               </tbody>
             </table>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
           </div>
         )}
       </Card>

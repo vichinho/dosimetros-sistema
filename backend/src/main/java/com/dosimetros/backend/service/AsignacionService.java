@@ -299,10 +299,10 @@ public class AsignacionService {
         return v == null ? "" : v;
     }
 
-    // #18: asignaciones pendientes de envío (no despachadas).
-    public List<AsignacionResponse> pendientesEnvio(Integer ejecutivoId, String trimestre) {
+    // #18: asignaciones por estado de envío (enviado=false => pendientes).
+    public List<AsignacionResponse> porEstadoEnvio(Integer ejecutivoId, String trimestre, boolean enviado) {
         String tri = (trimestre == null || trimestre.isBlank()) ? null : trimestre.trim();
-        return asignacionRepository.pendientesEnvio(ejecutivoId, tri)
+        return asignacionRepository.porEstadoEnvio(ejecutivoId, tri, enviado)
                 .stream()
                 .map(this::toResponse)
                 .toList();

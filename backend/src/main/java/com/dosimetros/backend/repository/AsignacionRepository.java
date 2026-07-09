@@ -59,18 +59,19 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>
     """)
     List<Object[]> portasDeEjecutivo(@Param("ejecutivoId") Integer ejecutivoId);
 
-    // #18: asignaciones pendientes de envío (no despachadas), filtrables por
-    // ejecutivo y trimestre. El orden fino se hace en el frontend.
+    // #18: asignaciones por estado de envío (pendientes o enviadas), filtrables
+    // por ejecutivo y trimestre. El orden fino se hace en el frontend.
     @Query("""
         SELECT a FROM Asignacion a
-        WHERE a.enviado = false
+        WHERE a.enviado = :enviado
           AND (:ejecutivoId IS NULL OR a.ejecutivo.id = :ejecutivoId)
           AND (:trimestre IS NULL OR a.trimestre = :trimestre)
         ORDER BY a.trimestre DESC, a.fechaAsignacion DESC, a.id DESC
     """)
-    List<Asignacion> pendientesEnvio(
+    List<Asignacion> porEstadoEnvio(
             @Param("ejecutivoId") Integer ejecutivoId,
-            @Param("trimestre") String trimestre
+            @Param("trimestre") String trimestre,
+            @Param("enviado") boolean enviado
     );
 
     // #14 (Correcciones): asignaciones filtrables (admin), para corregir en lote.

@@ -92,13 +92,15 @@ public class AsignacionController {
         return ResponseEntity.ok(service.correccionMasiva(request));
     }
 
-    // #18: asignaciones pendientes de envío (admin/operador, con filtro de ejecutivo).
+    // #18: asignaciones por estado de envío (admin/operador, con filtro de ejecutivo).
+    // enviado=false (por defecto) => pendientes; enviado=true => ya despachadas.
     @GetMapping("/pendientes-envio")
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<AsignacionResponse>> pendientesEnvio(
             @RequestParam(required = false) Integer ejecutivoId,
-            @RequestParam(required = false) String trimestre) {
-        return ResponseEntity.ok(service.pendientesEnvio(ejecutivoId, trimestre));
+            @RequestParam(required = false) String trimestre,
+            @RequestParam(required = false, defaultValue = "false") boolean enviado) {
+        return ResponseEntity.ok(service.porEstadoEnvio(ejecutivoId, trimestre, enviado));
     }
 
     // #18: marcar asignaciones como enviadas (o revertir).
