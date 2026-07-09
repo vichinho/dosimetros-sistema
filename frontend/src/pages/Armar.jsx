@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  getTareas,
   getTiposPorta,
   getResumenArmadoTareas,
   getDosimetrosDeTarea,
@@ -8,7 +7,6 @@ import {
   armarSeleccion,
 } from '../api/endpoints'
 import { Card, Button, Input, Select, Alert, Badge, Loading, EmptyState, Modal } from '../components/ui'
-import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 
 // Un dosímetro está pendiente de armar si no tiene porta o si su porta es una
@@ -49,7 +47,6 @@ const ESTADO_BANDEJA = {
 }
 
 export default function Armar() {
-  const [tareas, setTareas] = useState([])
   const [portas, setPortas] = useState([])
   const [tareaId, setTareaId] = useState('')
   const [dosimetros, setDosimetros] = useState([])
@@ -77,7 +74,6 @@ export default function Armar() {
   const cargarResumen = () => getResumenArmadoTareas().then(setResumen).catch(() => {})
 
   useEffect(() => {
-    getTareas().then(setTareas).catch(() => {})
     getTiposPorta().then(setPortas).catch(() => {})
     cargarResumen()
   }, [])
@@ -218,17 +214,6 @@ export default function Armar() {
           por rango de bandejas y, para bandejas incompletas, la grilla de slots.
         </p>
       </div>
-
-      <Card title="Tarea">
-        <div className="max-w-md">
-          <Combobox
-            label="Selecciona la tarea a armar"
-            options={tareas.map((t) => ({ value: t.id, label: t.numeroTarea }))}
-            value={tareaId}
-            onChange={onSelectTarea}
-          />
-        </div>
-      </Card>
 
       {/* Resumen de armado de todas las tareas (clickeable) */}
       <Card
