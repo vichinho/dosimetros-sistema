@@ -30,6 +30,7 @@ public class AsignacionRequest {
     @NotNull(message = "La fecha de asignación es obligatoria")
     private LocalDate fechaAsignacion;
 
+    @NotBlank(message = "El link de Trello es obligatorio")
     @Size(max = 500, message = "El link de Trello no puede superar 500 caracteres")
     private String linkTrello;
 

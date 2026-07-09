@@ -59,6 +59,13 @@ public class DosimetroController {
         return ResponseEntity.ok(service.buscarDetallePorNumero(numero));
     }
 
+    // #13 (individual): dosímetros disponibles con un número (para asignar uno concreto).
+    @GetMapping("/disponible-por-numero")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<DosimetroResponse>> disponiblesPorNumero(@RequestParam Integer numero) {
+        return ResponseEntity.ok(service.disponiblesPorNumero(numero));
+    }
+
     @GetMapping("/duplicados")
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<DuplicadoResponse>> duplicados() {

@@ -98,6 +98,10 @@ export const desactivarEjecutivo = (id) => client.patch(`/ejecutivos/${id}/desac
 // --- Asignaciones ---
 export const asignarMasivo = (data) =>
   client.post('/asignaciones/masivo', data).then((r) => r.data)
+export const asignarIndividual = (data) =>
+  client.post('/asignaciones', data).then((r) => r.data)
+export const getDisponiblesPorNumero = (numero) =>
+  client.get('/dosimetros/disponible-por-numero', { params: { numero } }).then((r) => r.data)
 
 // --- Vistas del ejecutivo ---
 export const getMisClientes = () => client.get('/ejecutivo/mis-clientes').then((r) => r.data)

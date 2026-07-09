@@ -1,36 +1,59 @@
 import { useEffect, useState } from 'react'
 import {
   asignarMasivo,
+  asignarIndividual,
   getClientes,
   getEjecutivos,
   getEmpresas,
   getTiposPorta,
   getTareasDisponibles,
+  getDisponiblesPorNumero,
 } from '../api/endpoints'
-import { Card, Button, Input, Alert } from '../components/ui'
+import { Card, Button, Input, Alert, Badge, EmptyState } from '../components/ui'
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 
 const TRIMESTRE_REGEX = /^[1-4]T\d{4}$/
+const hoyISO = () => new Date().toISOString().slice(0, 10)
+
+const DATOS_INICIALES = {
+  clienteId: '',
+  ejecutivoId: '',
+  empresaId: '',
+  tipoPortaId: '',
+  trimestre: '',
+  linkTrello: '',
+}
+
+// Normaliza el trimestre a mayúsculas y autocompleta el año si solo escribe "3T".
+function normalizaTrimestre(valor) {
+  let t = (valor || '').toUpperCase().replace(/\s/g, '')
+  if (/^[1-4]T$/.test(t)) t = t + new Date().getFullYear()
+  return t
+}
 
 export default function Asignar() {
+  const [vista, setVista] = useState('masiva') // 'masiva' | 'individual'
   const [clientes, setClientes] = useState([])
   const [ejecutivos, setEjecutivos] = useState([])
   const [empresas, setEmpresas] = useState([])
   const [portas, setPortas] = useState([])
-  const [tareas, setTareas] = useState([])
 
-  const [form, setForm] = useState({
-    clienteId: '',
-    ejecutivoId: '',
-    empresaId: '',
-    tipoPortaId: '',
-    trimestre: '',
-    cantidad: '',
-    linkTrello: '',
-  })
+  // Datos comunes a ambas vistas (se conservan al cambiar de pestaña)
+  const [datos, setDatos] = useState(DATOS_INICIALES)
+
+  // Masiva
+  const [tareas, setTareas] = useState([])
   const [tareasSeleccionadas, setTareasSeleccionadas] = useState([])
-  const [resultado, setResultado] = useState(null)
+  const [cantidad, setCantidad] = useState('')
+  const [resumenMasivo, setResumenMasivo] = useState(null)
+
+  // Individual
+  const [numero, setNumero] = useState('')
+  const [candidatos, setCandidatos] = useState(null) // null=sin buscar, []=sin resultados
+  const [dosimetroSel, setDosimetroSel] = useState(null)
+  const [resumenIndividual, setResumenIndividual] = useState(null)
+
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const toast = useToast()
@@ -42,67 +65,137 @@ export default function Asignar() {
     getTiposPorta().then(setPortas).catch(() => {})
   }, [])
 
-  // Solo tareas con dosímetros disponibles, compatibles con el porta elegido.
-  useEffect(() => {
-    const porta = portas.find((p) => String(p.id) === String(form.tipoPortaId))
-    getTareasDisponibles(porta ? porta.tipoDosimetroId : undefined)
+  // Masiva: tareas con disponibles compatibles con el porta elegido.
+  const recargarTareas = () => {
+    const porta = portas.find((p) => String(p.id) === String(datos.tipoPortaId))
+    return getTareasDisponibles(porta ? porta.tipoDosimetroId : undefined)
       .then(setTareas)
       .catch(() => setTareas([]))
+  }
+
+  useEffect(() => {
+    recargarTareas()
     setTareasSeleccionadas([])
-  }, [form.tipoPortaId, portas])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datos.tipoPortaId, portas])
 
-  const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value })
+  const setDato = (campo) => (e) => setDatos((d) => ({ ...d, [campo]: e.target.value }))
+  const setCombo = (campo) => (v) => setDatos((d) => ({ ...d, [campo]: v }))
 
-  // Trimestre: normaliza a mayúsculas y autocompleta el año si solo escribe "3T".
-  const normalizaTrimestre = (valor) => {
-    let t = valor.toUpperCase().replace(/\s/g, '')
-    if (/^[1-4]T$/.test(t)) t = t + new Date().getFullYear()
-    return t
+  const validarComunes = () => {
+    if (!datos.clienteId) return 'Selecciona un cliente'
+    if (!datos.ejecutivoId) return 'Selecciona un ejecutivo'
+    if (!datos.empresaId) return 'Selecciona una empresa'
+    if (!datos.tipoPortaId) return 'Selecciona el tipo de porta'
+    const trimestre = normalizaTrimestre(datos.trimestre)
+    if (!TRIMESTRE_REGEX.test(trimestre)) return 'El trimestre debe tener el formato 1T2026, 2T2026, etc.'
+    if (!datos.linkTrello.trim()) return 'El link de Trello es obligatorio'
+    return null
   }
 
   const toggleTarea = (id) => {
-    setTareasSeleccionadas((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
-    )
+    setTareasSeleccionadas((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]))
   }
 
-  const handleSubmit = async (e) => {
+  // Portas compatibles para la vista individual (según el dosímetro encontrado).
+  const portasParaSelect =
+    vista === 'individual' && dosimetroSel
+      ? portas.filter((p) => String(p.tipoDosimetroId) === String(dosimetroSel.tipoDosimetroId))
+      : portas
+
+  // --- Campos comunes (cliente, ejecutivo, empresa, porta, trimestre, link) ---
+  const CamposComunes = (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Combobox
+        label="Cliente"
+        options={clientes.map((c) => ({ value: c.id, label: c.razonSocial }))}
+        value={datos.clienteId}
+        onChange={setCombo('clienteId')}
+        required
+      />
+      <Combobox
+        label="Ejecutivo"
+        options={ejecutivos.map((e) => ({ value: e.id, label: e.nombre }))}
+        value={datos.ejecutivoId}
+        onChange={setCombo('ejecutivoId')}
+        required
+      />
+      <Combobox
+        label="Empresa"
+        options={empresas.map((e) => ({ value: e.id, label: e.nombre }))}
+        value={datos.empresaId}
+        onChange={setCombo('empresaId')}
+        required
+      />
+      <Combobox
+        label="Tipo de porta"
+        options={portasParaSelect.map((p) => ({ value: p.id, label: p.nombre }))}
+        value={datos.tipoPortaId}
+        onChange={setCombo('tipoPortaId')}
+        required
+      />
+      <label className="block">
+        <span className="block text-sm font-medium text-ink/70 mb-1.5">Trimestre</span>
+        <input
+          value={datos.trimestre}
+          onChange={setDato('trimestre')}
+          onBlur={() => setDatos((d) => ({ ...d, trimestre: normalizaTrimestre(d.trimestre) }))}
+          placeholder="Ej: 3T  →  3T2026"
+          pattern="[1-4]T[0-9]{4}"
+          title="Formato: 1T2026, 2T2026, etc."
+          className="w-full px-3 py-2 border border-mist rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-steel/40 focus:border-steel transition"
+          required
+        />
+      </label>
+      {/* #11 Link de Trello: borde visible y obligatorio */}
+      <label className="block">
+        <span className="block text-sm font-medium text-ink/70 mb-1.5">
+          Link de Trello <span className="text-red-500">*</span>
+        </span>
+        <input
+          value={datos.linkTrello}
+          onChange={setDato('linkTrello')}
+          placeholder="https://trello.com/c/…"
+          className="w-full px-3 py-2 border-2 border-mist rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-steel/40 focus:border-steel transition"
+          required
+        />
+      </label>
+    </div>
+  )
+
+  // --- Masiva ---
+  const totalDisponibles = tareas.reduce((a, t) => a + (t.disponibles || 0), 0)
+  const disponiblesSeleccionadas = tareas
+    .filter((t) => tareasSeleccionadas.includes(t.id))
+    .reduce((a, t) => a + (t.disponibles || 0), 0)
+
+  const onAsignarMasivo = async (e) => {
     e.preventDefault()
     setError('')
-    setResultado(null)
-
-    // Validar cliente
-    if (!form.clienteId) {
-      setError('Selecciona un cliente válido de la lista')
-      return
-    }
-
-    // Validar formato de trimestre (ej. 3T2026)
-    const trimestre = normalizaTrimestre(form.trimestre)
-    if (!TRIMESTRE_REGEX.test(trimestre)) {
-      setError('El trimestre debe tener el formato 1T2026, 2T2026, etc.')
-      return
-    }
-
-    if (tareasSeleccionadas.length === 0) {
-      setError('Selecciona al menos una tarea')
-      return
-    }
+    setResumenMasivo(null)
+    const errComun = validarComunes()
+    if (errComun) return setError(errComun)
+    if (!cantidad || Number(cantidad) < 1) return setError('Indica la cantidad a asignar')
+    if (tareasSeleccionadas.length === 0) return setError('Selecciona al menos una tarea')
 
     setLoading(true)
     try {
       const data = await asignarMasivo({
-        clienteId: Number(form.clienteId),
-        ejecutivoId: Number(form.ejecutivoId),
-        empresaId: Number(form.empresaId),
-        tipoPortaId: Number(form.tipoPortaId),
-        trimestre,
-        cantidad: Number(form.cantidad),
+        clienteId: Number(datos.clienteId),
+        ejecutivoId: Number(datos.ejecutivoId),
+        empresaId: Number(datos.empresaId),
+        tipoPortaId: Number(datos.tipoPortaId),
+        trimestre: normalizaTrimestre(datos.trimestre),
+        cantidad: Number(cantidad),
         tareaIds: tareasSeleccionadas,
-        linkTrello: form.linkTrello || null,
+        linkTrello: datos.linkTrello.trim(),
       })
-      setResultado(data)
+      setResumenMasivo(data)
       toast.success(`${data.cantidadAsignada} dosímetros asignados`)
+      // #10: refrescar tareas (las que quedaron en 0 desaparecen) y limpiar selección
+      setTareasSeleccionadas([])
+      setCantidad('')
+      recargarTareas()
     } catch (err) {
       const msg = err.response?.data?.message || 'No se pudo realizar la asignación'
       setError(msg)
@@ -112,120 +205,263 @@ export default function Asignar() {
     }
   }
 
+  // --- Individual ---
+  const buscarNumero = async () => {
+    setError('')
+    setResumenIndividual(null)
+    setDosimetroSel(null)
+    if (!numero) return setError('Escribe un número de dosímetro')
+    try {
+      const encontrados = await getDisponiblesPorNumero(Number(numero))
+      setCandidatos(encontrados)
+      if (encontrados.length === 1) setDosimetroSel(encontrados[0])
+    } catch {
+      toast.error('No se pudo buscar el dosímetro')
+    }
+  }
+
+  const onAsignarIndividual = async (e) => {
+    e.preventDefault()
+    setError('')
+    setResumenIndividual(null)
+    if (!dosimetroSel) return setError('Busca y selecciona un dosímetro disponible')
+    const errComun = validarComunes()
+    if (errComun) return setError(errComun)
+
+    setLoading(true)
+    try {
+      const data = await asignarIndividual({
+        dosimetroId: dosimetroSel.id,
+        clienteId: Number(datos.clienteId),
+        ejecutivoId: Number(datos.ejecutivoId),
+        empresaId: Number(datos.empresaId),
+        tipoPortaId: Number(datos.tipoPortaId),
+        trimestre: normalizaTrimestre(datos.trimestre),
+        fechaAsignacion: hoyISO(),
+        linkTrello: datos.linkTrello.trim(),
+      })
+      setResumenIndividual(data)
+      toast.success(`Dosímetro #${data.numeroDosimetro} asignado`)
+      // limpiar la búsqueda para asignar el siguiente
+      setNumero('')
+      setCandidatos(null)
+      setDosimetroSel(null)
+    } catch (err) {
+      const msg = err.response?.data?.message || 'No se pudo asignar el dosímetro'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const tabBtn = (k, label) => (
+    <button
+      type="button"
+      onClick={() => { setVista(k); setError('') }}
+      className={`px-4 py-1.5 text-sm ${vista === k ? 'bg-steel text-white' : 'bg-white text-ink/70 hover:bg-mist/20'}`}
+    >
+      {label}
+    </button>
+  )
+
   return (
     <div className="space-y-6 max-w-4xl">
-      <h1 className="text-2xl font-bold text-ink">Asignación masiva</h1>
+      <h1 className="text-2xl font-bold text-ink">Asignación de dosímetros</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card title="Datos de la asignación">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Cliente: combobox buscable estilizado */}
-            <Combobox
-              label="Cliente"
-              options={clientes.map((c) => ({ value: c.id, label: c.razonSocial }))}
-              value={form.clienteId}
-              onChange={(v) => setForm((f) => ({ ...f, clienteId: v }))}
-              required
-            />
+      <div className="inline-flex rounded-lg border border-mist overflow-hidden">
+        {tabBtn('masiva', 'Masiva (por tareas)')}
+        {tabBtn('individual', 'Individual (por número)')}
+      </div>
 
-            <Combobox
-              label="Ejecutivo"
-              options={ejecutivos.map((e) => ({ value: e.id, label: e.nombre }))}
-              value={form.ejecutivoId}
-              onChange={(v) => setForm((f) => ({ ...f, ejecutivoId: v }))}
-              required
-            />
-            <Combobox
-              label="Empresa"
-              options={empresas.map((e) => ({ value: e.id, label: e.nombre }))}
-              value={form.empresaId}
-              onChange={(v) => setForm((f) => ({ ...f, empresaId: v }))}
-              required
-            />
-            <Combobox
-              label="Tipo de porta"
-              options={portas.map((p) => ({ value: p.id, label: p.nombre }))}
-              value={form.tipoPortaId}
-              onChange={(v) => setForm((f) => ({ ...f, tipoPortaId: v }))}
-              required
-            />
+      <Card title="Datos de la asignación">{CamposComunes}</Card>
 
-            {/* Trimestre: valida formato y autocompleta el año */}
-            <label className="block">
-              <span className="block text-sm font-medium text-ink/70 mb-1.5">Trimestre</span>
-              <input
-                value={form.trimestre}
-                onChange={set('trimestre')}
-                onBlur={() => setForm((f) => ({ ...f, trimestre: normalizaTrimestre(f.trimestre) }))}
-                placeholder="Ej: 3T  →  3T2026"
-                pattern="[1-4]T[0-9]{4}"
-                title="Formato: 1T2026, 2T2026, etc."
-                className="w-full px-3 py-2 border border-mist rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-steel/40 focus:border-steel transition"
+      {vista === 'masiva' && (
+        <form onSubmit={onAsignarMasivo} className="space-y-6">
+          <Card
+            title="Tareas disponibles"
+            action={
+              <span className="text-sm text-ink/70">
+                Total disponible: <b className="text-ink">{totalDisponibles}</b>
+              </span>
+            }
+          >
+            <p className="text-sm text-slate-500 mb-3">
+              Solo se muestran tareas con dosímetros disponibles
+              {datos.tipoPortaId ? ' compatibles con el porta elegido' : ''}. El sistema elige
+              automáticamente los dosímetros dentro de las tareas marcadas.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {tareas.map((t) => (
+                <label
+                  key={t.id}
+                  className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm ${
+                    tareasSeleccionadas.includes(t.id) ? 'border-steel bg-steel/10' : 'border-mist'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={tareasSeleccionadas.includes(t.id)}
+                      onChange={() => toggleTarea(t.id)}
+                    />
+                    {t.numeroTarea}
+                  </span>
+                  <span className="text-xs text-steel font-medium">{t.disponibles}</span>
+                </label>
+              ))}
+              {tareas.length === 0 && (
+                <p className="text-sm text-slate-400">No hay tareas con dosímetros disponibles</p>
+              )}
+            </div>
+            {tareasSeleccionadas.length > 0 && (
+              <p className="text-sm text-ink/70 mt-3">
+                Seleccionadas: <b>{tareasSeleccionadas.length}</b> tareas ·{' '}
+                <b>{disponiblesSeleccionadas}</b> dosímetros disponibles
+              </p>
+            )}
+          </Card>
+
+          <Card title="Cantidad a asignar">
+            <div className="max-w-xs">
+              <Input
+                label="Cantidad"
+                type="number"
+                min="1"
+                max={disponiblesSeleccionadas || undefined}
+                value={cantidad}
+                onChange={(e) => setCantidad(e.target.value)}
                 required
               />
-            </label>
+            </div>
+          </Card>
 
-            <Input
-              label="Cantidad"
-              type="number"
-              min="1"
-              value={form.cantidad}
-              onChange={set('cantidad')}
-              required
-            />
-            <Input
-              label="Link de Trello (opcional)"
-              value={form.linkTrello}
-              onChange={set('linkTrello')}
-              className="md:col-span-2"
-            />
-          </div>
-        </Card>
+          {error && <Alert type="error">{error}</Alert>}
 
-        <Card title="Tareas disponibles">
-          <p className="text-sm text-slate-500 mb-3">
-            Solo se muestran tareas con dosímetros disponibles
-            {form.tipoPortaId ? ' compatibles con el porta elegido' : ''}. El sistema elige
-            automáticamente los dosímetros dentro de las tareas marcadas.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {tareas.map((t) => (
-              <label
-                key={t.id}
-                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm ${
-                  tareasSeleccionadas.includes(t.id) ? 'border-steel bg-steel/10' : 'border-mist'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={tareasSeleccionadas.includes(t.id)}
-                    onChange={() => toggleTarea(t.id)}
-                  />
-                  {t.numeroTarea}
-                </span>
-                <span className="text-xs text-steel font-medium">{t.disponibles}</span>
-              </label>
-            ))}
-            {tareas.length === 0 && (
-              <p className="text-sm text-slate-400">No hay tareas con dosímetros disponibles</p>
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Asignando…' : 'Asignar dosímetros'}
+          </Button>
+
+          {/* #10: resumen de lo asignado */}
+          {resumenMasivo && (
+            <Card title="Resumen de la asignación">
+              <p className="text-sm text-ink/80 mb-3">
+                Se asignaron <b>{resumenMasivo.cantidadAsignada}</b> de{' '}
+                {resumenMasivo.cantidadSolicitada} dosímetros solicitados.
+              </p>
+              <ResumenAsignaciones asignaciones={resumenMasivo.asignaciones} />
+            </Card>
+          )}
+        </form>
+      )}
+
+      {vista === 'individual' && (
+        <form onSubmit={onAsignarIndividual} className="space-y-6">
+          <Card title="Dosímetro a asignar">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-48">
+                <Input
+                  label="Número de dosímetro"
+                  type="number"
+                  value={numero}
+                  onChange={(e) => setNumero(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); buscarNumero() } }}
+                />
+              </div>
+              <Button type="button" variant="secondary" onClick={buscarNumero}>
+                Buscar
+              </Button>
+            </div>
+
+            {candidatos !== null && candidatos.length === 0 && (
+              <div className="mt-3">
+                <EmptyState>No hay un dosímetro disponible con ese número.</EmptyState>
+              </div>
             )}
-          </div>
-        </Card>
+            {candidatos && candidatos.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {candidatos.map((d) => (
+                  <label
+                    key={d.id}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer text-sm ${
+                      dosimetroSel?.id === d.id ? 'border-steel bg-steel/10' : 'border-mist'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="dosimetroSel"
+                      checked={dosimetroSel?.id === d.id}
+                      onChange={() => setDosimetroSel(d)}
+                    />
+                    <span className="font-medium text-ink">#{d.numero}</span>
+                    <span className="text-slate-500">{d.tipoDosimetroNombre}</span>
+                    <span className="text-slate-500">Porta: {d.tipoPortaNombre || '—'}</span>
+                    <span className="text-slate-500">Tarea: {d.numeroTarea || '—'}</span>
+                    <Badge color="green">disponible</Badge>
+                  </label>
+                ))}
+              </div>
+            )}
+          </Card>
 
-        <Alert type="error">{error}</Alert>
+          {error && <Alert type="error">{error}</Alert>}
 
-        {resultado && (
-          <Alert type="success">
-            Asignación exitosa: {resultado.cantidadAsignada} de {resultado.cantidadSolicitada}{' '}
-            dosímetros asignados.
-          </Alert>
+          <Button type="submit" disabled={loading || !dosimetroSel}>
+            {loading ? 'Asignando…' : 'Asignar dosímetro'}
+          </Button>
+
+          {resumenIndividual && (
+            <Card title="Resumen de la asignación">
+              <ResumenAsignaciones asignaciones={[resumenIndividual]} />
+            </Card>
+          )}
+        </form>
+      )}
+    </div>
+  )
+}
+
+// Tabla compacta con el detalle de lo asignado (#10).
+function ResumenAsignaciones({ asignaciones }) {
+  if (!asignaciones || asignaciones.length === 0) return null
+  const a0 = asignaciones[0]
+  return (
+    <div>
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-ink/70 mb-3">
+        <span>Cliente: <b className="text-ink">{a0.clienteNombre}</b></span>
+        <span>Ejecutivo: <b className="text-ink">{a0.ejecutivoNombre}</b></span>
+        <span>Empresa: <b className="text-ink">{a0.empresaNombre}</b></span>
+        <span>Trimestre: <b className="text-ink">{a0.trimestre}</b></span>
+        {a0.linkTrello && (
+          <a href={a0.linkTrello} target="_blank" rel="noreferrer" className="text-steel hover:underline">
+            Ver en Trello ↗
+          </a>
         )}
-
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Asignando…' : 'Asignar dosímetros'}
-        </Button>
-      </form>
+      </div>
+      <div className="overflow-x-auto max-h-72 overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-white">
+            <tr className="text-left text-slate-500 border-b border-slate-200">
+              <th className="py-2 font-medium">Dosímetro</th>
+              <th className="py-2 font-medium">Porta</th>
+              <th className="py-2 font-medium">Tarea</th>
+              <th className="py-2 font-medium">Bandeja/Slot</th>
+            </tr>
+          </thead>
+          <tbody>
+            {asignaciones.map((a) => (
+              <tr key={a.id} className="border-b border-slate-100">
+                <td className="py-2 font-medium text-ink">#{a.numeroDosimetro}</td>
+                <td className="py-2 text-slate-600">{a.tipoPortaNombre}</td>
+                <td className="py-2 text-slate-600">{a.numeroTarea || '—'}</td>
+                <td className="py-2 text-slate-600">
+                  {a.numeroBandeja != null ? `${a.numeroBandeja} / ${a.slotBandeja}` : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

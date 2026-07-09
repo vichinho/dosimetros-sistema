@@ -320,6 +320,14 @@ public class DosimetroService {
         return new ActualizarTipoPortaRangoResponse(dosimetros.size());
     }
 
+    // #13 (individual): dosímetros disponibles con un número dado (para asignar uno concreto).
+    public List<DosimetroResponse> disponiblesPorNumero(Integer numero) {
+        return dosimetroRepository.findByNumeroOrderByIdAsc(numero).stream()
+                .filter(d -> "disponible".equalsIgnoreCase(d.getEstado()))
+                .map(this::toResponse)
+                .toList();
+    }
+
     // #7: resumen de armado de todas las tareas (armadas / parciales / sin armar).
     public List<TareaArmadoResponse> resumenArmadoPorTarea() {
         return dosimetroRepository.resumenArmadoPorTarea().stream()
