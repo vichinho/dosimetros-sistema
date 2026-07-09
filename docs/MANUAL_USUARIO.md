@@ -105,11 +105,85 @@ dosímetro a esa fecha.
 
 ## 1.2 Importar Excel
 
-_(pendiente de completar)_
+**Acceso:** solo Administrador.
+
+**Propósito.** Cargar el inventario de dosímetros de forma masiva desde una
+planilla Excel, en lugar de ingresarlos uno por uno. Es la vía de **alta
+inicial** de dosímetros al sistema.
+
+### Qué se ve en pantalla
+
+- Una tarjeta con las **instrucciones** y las columnas esperadas.
+- Un botón **"Descargar plantilla de ejemplo"**.
+- Un **selector de archivo** (.xlsx) y el botón **"Importar"**.
+- Tras importar, una tarjeta de **resultado** con los totales (filas
+  procesadas, exitosas, fallidas) y el **detalle de errores** por fila.
+
+### Funcionalidades
+
+- **Descargar plantilla:** genera un archivo `.xlsx` con los encabezados
+  correctos y una fila de ejemplo ya rellenada, para guiar el llenado.
+- **Importar archivo:** sube la planilla y crea los dosímetros.
+- **Resumen y control de errores:** informa cuántas filas se cargaron, cuántas
+  se omitieron o fallaron y por qué (fila por fila).
+
+### Columnas de la planilla
+
+| Columna | Obligatoria | Descripción |
+|---|---|---|
+| `numero_dosimetro` | Sí | Número físico del dosímetro. |
+| `tipo_dosimetro` | Sí | TLD, OSL o Cristal. |
+| `tipo_porta` | No | Tipo de porta (debe ser compatible con el tipo). |
+| `numero_tarea` | No | Tarea/lote (vacío para OSL). |
+| `numero_bandeja` | No | Número de bandeja (vacío para OSL). |
+| `slot_bandeja` | No | Posición dentro de la bandeja (vacío para OSL). |
+
+### Qué cumple / notas
+
+- Reemplaza la carga manual y la antigua planilla histórica.
+- **No duplica:** si un número ya existe en el sistema, o se repite dentro del
+  mismo archivo, esa fila se **omite** y se informa (no crea un duplicado).
+- Esta pantalla es de **alta** (crear). Para **actualizar** stock ya existente
+  desde un archivo se usa "Actualizar stock por archivo" dentro de **Stock**.
 
 ## 1.3 Usuarios
 
-_(pendiente de completar)_
+**Acceso:** solo Administrador.
+
+**Propósito.** Administrar quién puede entrar al sistema y con qué nivel de
+acceso: crear, editar y desactivar usuarios, y asignarles su rol.
+
+### Qué se ve en pantalla
+
+- Un **formulario** de alta/edición con: Usuario, Contraseña, Rol y
+  "Ejecutivo asociado".
+- Una **tabla de usuarios** con: nombre de usuario, rol (con color), ejecutivo
+  vinculado, estado (Activo/Inactivo) y acciones (**Editar**, **Desactivar**).
+
+### Funcionalidades
+
+- **Crear usuario:** nombre de usuario, contraseña, rol y —solo si el rol es
+  Ejecutivo— el ejecutivo al que queda asociado.
+- **Editar usuario:** cambiar rol y ejecutivo asociado, y **restablecer la
+  contraseña** (si se deja vacía, se mantiene la actual). El nombre de usuario
+  no se modifica.
+- **Desactivar usuario:** deja al usuario sin acceso conservando su registro
+  (baja lógica, no se borra).
+
+### Roles disponibles
+
+- **Administrador:** acceso total, incluidos Dashboard, Importar y Usuarios.
+- **Operador:** gestión operativa (stock, armado, asignación, catálogos), sin
+  los módulos exclusivos del administrador.
+- **Ejecutivo:** solo consulta de su propia cartera. **Requiere** vincularse a
+  un ejecutivo: ese vínculo es lo que hace que en sus pantallas "Mis…" vea
+  únicamente sus clientes, dosímetros y asignaciones.
+
+### Notas
+
+- Las contraseñas se guardan cifradas (no se almacenan en texto plano).
+- Un usuario con rol Ejecutivo **sin** ejecutivo asociado no podría ver su
+  información; por eso el sistema exige elegirlo al crearlo.
 
 ---
 
