@@ -234,6 +234,42 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
         return response;
     }
 
+    @Override
+    public byte[] plantillaExcel() {
+        String[] cabeceras = {"numero_dosimetro", "tipo_dosimetro", "tipo_porta",
+                "numero_tarea", "numero_bandeja", "slot_bandeja"};
+        // Fila de ejemplo ficticia para guiar el llenado.
+        String[] ejemplo = {"12345", "TLD", "Porta gringo", "1765", "3", "12"};
+
+        try (Workbook wb = new XSSFWorkbook();
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Carga");
+
+            Row header = sheet.createRow(0);
+            CellStyle negrita = wb.createCellStyle();
+            Font font = wb.createFont();
+            font.setBold(true);
+            negrita.setFont(font);
+            for (int i = 0; i < cabeceras.length; i++) {
+                Cell c = header.createCell(i);
+                c.setCellValue(cabeceras[i]);
+                c.setCellStyle(negrita);
+            }
+
+            Row fila = sheet.createRow(1);
+            for (int i = 0; i < ejemplo.length; i++) {
+                fila.createCell(i).setCellValue(ejemplo[i]);
+            }
+
+            for (int i = 0; i < cabeceras.length; i++) sheet.autoSizeColumn(i);
+
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Error al generar la plantilla", e);
+        }
+    }
+
     // --- Helpers compartidos ---
 
     private void validarArchivo(MultipartFile file) {

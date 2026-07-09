@@ -9,4 +9,7 @@ public interface ImportacionDosimetroService {
 
     // #8: actualización de stock por archivo con upsert (clave = número).
     ActualizacionStockResponse actualizarStockExcel(MultipartFile file);
+
+    // #17: plantilla .xlsx con encabezados y una fila de ejemplo.
+    byte[] plantillaExcel();
 }

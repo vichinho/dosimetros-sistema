@@ -51,6 +51,8 @@ export const actualizarStockExcel = (file) => {
   formData.append('file', file)
   return client.post('/dosimetros/importacion/actualizar', formData).then((r) => r.data)
 }
+export const descargarPlantillaDosimetros = () =>
+  client.get('/dosimetros/importacion/plantilla', { responseType: 'blob' }).then((r) => r.data)
 export const exportarStockExcel = (params) =>
   client.get('/dosimetros/stock/export', { params, responseType: 'blob' }).then((r) => r.data)
 export const buscarDosimetro = (numero) =>
