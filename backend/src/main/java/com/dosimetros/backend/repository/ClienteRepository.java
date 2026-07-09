@@ -22,6 +22,26 @@ public interface ClienteRepository extends JpaRepository<Cliente, Integer> {
     // Clientes cuyo ejecutivo responsable es el indicado (HU #3 / #16)
     List<Cliente> findByEjecutivoIdAndActivoTrueOrderByRazonSocialAsc(Integer ejecutivoId);
 
+    // #16: clientes activos filtrados por ejecutivo, empresa (vía asignaciones)
+    // y texto de búsqueda (razón social o nombre fantasía). Todos opcionales.
+    @Query("""
+        SELECT c FROM Cliente c
+        WHERE c.activo = true
+          AND (:ejecutivoId IS NULL OR c.ejecutivo.id = :ejecutivoId)
+          AND (:q IS NULL
+               OR LOWER(c.razonSocial) LIKE LOWER(CONCAT('%', :q, '%'))
+               OR LOWER(COALESCE(c.nombreCorto, '')) LIKE LOWER(CONCAT('%', :q, '%')))
+          AND (:empresaId IS NULL OR EXISTS (
+               SELECT 1 FROM Asignacion a
+               WHERE a.cliente.id = c.id AND a.empresa.id = :empresaId))
+        ORDER BY c.razonSocial ASC
+    """)
+    List<Cliente> filtrar(
+            @Param("ejecutivoId") Integer ejecutivoId,
+            @Param("empresaId") Integer empresaId,
+            @Param("q") String q
+    );
+
     // Ids de clientes que actualmente son el último destino de algún dosímetro
     // en estado 'asignado' (es decir, tienen dosímetros vigentes).
     @Query("""

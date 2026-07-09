@@ -4,6 +4,7 @@ import {
   crearCliente,
   desactivarCliente,
   getEjecutivos,
+  getEmpresas,
   getAsignacionesPorCliente,
 } from '../api/endpoints'
 import {
@@ -24,23 +25,42 @@ const POR_PAGINA = 20
 export default function Clientes() {
   const [clientes, setClientes] = useState([])
   const [ejecutivos, setEjecutivos] = useState([])
+  const [empresas, setEmpresas] = useState([])
+  const [filtros, setFiltros] = useState({ q: '', ejecutivoId: '', empresaId: '' })
   const [form, setForm] = useState({ razonSocial: '', nombreCorto: '', ejecutivoId: '' })
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [detalle, setDetalle] = useState(null) // { cliente, asignaciones, loading }
   const toast = useToast()
 
-  const cargar = () =>
-    getClientes()
-      .then(setClientes)
+  const cargar = (f = filtros) => {
+    const params = {}
+    if (f.q) params.q = f.q
+    if (f.ejecutivoId) params.ejecutivoId = f.ejecutivoId
+    if (f.empresaId) params.empresaId = f.empresaId
+    setLoading(true)
+    return getClientes(params)
+      .then((data) => {
+        setClientes(data)
+        setPage(1)
+      })
       .catch(() => toast.error('No se pudieron cargar los clientes'))
       .finally(() => setLoading(false))
+  }
 
   useEffect(() => {
-    cargar()
+    cargar(filtros)
     getEjecutivos().then(setEjecutivos).catch(() => {})
+    getEmpresas().then(setEmpresas).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Cambiar un select de filtro recarga de inmediato.
+  const setFiltro = (campo) => (e) => {
+    const next = { ...filtros, [campo]: e.target.value }
+    setFiltros(next)
+    cargar(next)
+  }
 
   const handleCrear = async (e) => {
     e.preventDefault()
@@ -113,7 +133,43 @@ export default function Clientes() {
         </form>
       </Card>
 
-      <Card title={`Clientes activos (${clientes.length})`}>
+      <Card title="Filtrar clientes">
+        <form
+          onSubmit={(e) => { e.preventDefault(); cargar() }}
+          className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+        >
+          <Input
+            label="Buscar (razón social o fantasía)"
+            value={filtros.q}
+            onChange={(e) => setFiltros({ ...filtros, q: e.target.value })}
+            placeholder="Escribe y Enter…"
+          />
+          <Select label="Ejecutivo responsable" value={filtros.ejecutivoId} onChange={setFiltro('ejecutivoId')}>
+            <option value="">Todos</option>
+            {ejecutivos.map((ej) => (
+              <option key={ej.id} value={ej.id}>{ej.nombre}</option>
+            ))}
+          </Select>
+          <Select label="Empresa (con asignaciones)" value={filtros.empresaId} onChange={setFiltro('empresaId')}>
+            <option value="">Todas</option>
+            {empresas.map((em) => (
+              <option key={em.id} value={em.id}>{em.nombre}</option>
+            ))}
+          </Select>
+          <div className="flex gap-2">
+            <Button type="submit">Buscar</Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { const v = { q: '', ejecutivoId: '', empresaId: '' }; setFiltros(v); cargar(v) }}
+            >
+              Limpiar
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <Card title={`Clientes (${clientes.length})`}>
         {loading ? (
           <Loading />
         ) : (

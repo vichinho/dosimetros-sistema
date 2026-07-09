@@ -33,6 +33,16 @@ public class ClienteService {
                 .toList();
     }
 
+    // #16: clientes activos filtrados por ejecutivo, empresa y/o texto.
+    public List<ClienteResponse> filtrar(Integer ejecutivoId, Integer empresaId, String q) {
+        String qq = (q == null || q.isBlank()) ? null : q.trim();
+        Set<Integer> conDosimetros = clientesConDosimetroVigente();
+        return clienteRepository.filtrar(ejecutivoId, empresaId, qq)
+                .stream()
+                .map(c -> toResponse(c, conDosimetros))
+                .toList();
+    }
+
     // HU #3 / #16: clientes cuyo ejecutivo responsable es el logueado.
     public List<ClienteResponse> listarPorEjecutivo(Integer ejecutivoId) {
         Set<Integer> conDosimetros = clientesConDosimetroVigente();

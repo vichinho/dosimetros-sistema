@@ -84,7 +84,7 @@ export const armarSeleccion = (data) =>
   client.patch('/dosimetros/porta-seleccion', data).then((r) => r.data)
 
 // --- Clientes ---
-export const getClientes = () => client.get('/clientes').then((r) => r.data)
+export const getClientes = (params) => client.get('/clientes', { params }).then((r) => r.data)
 export const crearCliente = (data) => client.post('/clientes', data).then((r) => r.data)
 export const actualizarCliente = (id, data) =>
   client.put(`/clientes/${id}`, data).then((r) => r.data)

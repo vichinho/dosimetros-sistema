@@ -24,8 +24,15 @@ public class ClienteController {
     // para ver únicamente los suyos (HU #3).
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
-    public ResponseEntity<List<ClienteResponse>> listarActivos() {
-        return ResponseEntity.ok(clienteService.listarActivos());
+    public ResponseEntity<List<ClienteResponse>> listarActivos(
+            @RequestParam(required = false) Integer ejecutivoId,
+            @RequestParam(required = false) Integer empresaId,
+            @RequestParam(required = false) String q) {
+        // #16: si vienen filtros, se aplican; sin filtros devuelve todos los activos.
+        if (ejecutivoId == null && empresaId == null && (q == null || q.isBlank())) {
+            return ResponseEntity.ok(clienteService.listarActivos());
+        }
+        return ResponseEntity.ok(clienteService.filtrar(ejecutivoId, empresaId, q));
     }
 
     @GetMapping("/{id}")
