@@ -118,6 +118,14 @@ export default function PendienteEnvio() {
 
   const flechaOrden = (campo) => (orden.campo === campo ? (orden.dir === 'asc' ? '↑' : '↓') : '')
 
+  const hayFiltros = busqueda !== '' || trimestresSel.size > 0 || (!esEjecutivo && ejecutivoId !== '')
+  const limpiarFiltros = () => {
+    setBusqueda('')
+    setTrimestresSel(new Set())
+    if (!esEjecutivo) setEjecutivoId('')
+    setOrden({ campo: 'trimestre', dir: 'desc' })
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -144,28 +152,43 @@ export default function PendienteEnvio() {
         </button>
       </div>
 
-      <Card title="Filtros">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <Card
+        title="Filtros"
+        action={
+          hayFiltros && (
+            <button type="button" onClick={limpiarFiltros} className="text-sm text-steel hover:underline">
+              Limpiar filtros
+            </button>
+          )
+        }
+      >
+        <div className="divide-y divide-mist/50">
+          {/* Búsqueda y ejecutivo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-5">
             <Input
-              label="Buscar por N° de dosímetro"
+              label="N° de dosímetro"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Ej: 12345"
+              placeholder="Buscar… ej: 12345"
             />
-          </div>
-          {!esEjecutivo && (
-            <div className="max-w-xs">
+            {!esEjecutivo && (
               <Select label="Ejecutivo" value={ejecutivoId} onChange={(e) => setEjecutivoId(e.target.value)}>
-                <option value="">Todos</option>
+                <option value="">Todos los ejecutivos</option>
                 {ejecutivos.map((ej) => (
                   <option key={ej.id} value={ej.id}>{ej.nombre}</option>
                 ))}
               </Select>
+            )}
+          </div>
+
+          {/* Trimestres */}
+          <div className="py-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">Trimestre</p>
+              <span className="text-xs text-ink/40">
+                {trimestresSel.size === 0 ? 'Todos' : `${trimestresSel.size} seleccionados`}
+              </span>
             </div>
-          )}
-          <div>
-            <p className="text-sm font-medium text-ink/70 mb-1.5">Trimestres (vacío = todos)</p>
             {trimestresDisponibles.length === 0 ? (
               <p className="text-sm text-slate-400">Sin trimestres</p>
             ) : (
@@ -175,8 +198,10 @@ export default function PendienteEnvio() {
                     key={t}
                     type="button"
                     onClick={() => toggleTrimestre(t)}
-                    className={`px-3 py-1 rounded-full border text-sm ${
-                      trimestresSel.has(t) ? 'bg-steel text-white border-steel' : 'bg-white text-ink/70 border-mist hover:bg-mist/20'
+                    className={`px-3 py-1 rounded-full border text-sm transition ${
+                      trimestresSel.has(t)
+                        ? 'bg-steel text-white border-steel'
+                        : 'bg-white text-ink/70 border-mist hover:border-steel/50'
                     }`}
                   >
                     {t}
@@ -185,21 +210,31 @@ export default function PendienteEnvio() {
               </div>
             )}
           </div>
-          <div>
-            <p className="text-sm font-medium text-ink/70 mb-1.5">Ordenar por</p>
+
+          {/* Orden */}
+          <div className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink/50 mb-2">Ordenar por</p>
             <div className="flex flex-wrap gap-2">
-              {CAMPOS_ORDEN.map((c) => (
-                <button
-                  key={c.k}
-                  type="button"
-                  onClick={() => ordenarPor(c.k)}
-                  className={`px-3 py-1.5 rounded-lg border text-sm ${
-                    orden.campo === c.k ? 'bg-steel/10 border-steel text-steel' : 'bg-white text-ink/70 border-mist hover:bg-mist/20'
-                  }`}
-                >
-                  {c.label} {flechaOrden(c.k)}
-                </button>
-              ))}
+              {CAMPOS_ORDEN.map((c) => {
+                const activo = orden.campo === c.k
+                return (
+                  <button
+                    key={c.k}
+                    type="button"
+                    onClick={() => ordenarPor(c.k)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition ${
+                      activo
+                        ? 'bg-steel/10 border-steel text-steel font-medium'
+                        : 'bg-white text-ink/70 border-mist hover:border-steel/50'
+                    }`}
+                  >
+                    {c.label}
+                    <span className={activo ? 'opacity-100' : 'opacity-0'}>
+                      {orden.dir === 'asc' ? '↑' : '↓'}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
