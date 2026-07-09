@@ -22,6 +22,8 @@ public class AsignacionResponse {
     private String trimestre;
     private LocalDate fechaAsignacion;
     private String linkTrello;
+    private boolean enviado;
+    private LocalDate fechaEnvio;
 
     public AsignacionResponse() {
     }
@@ -206,5 +208,21 @@ public class AsignacionResponse {
 
     public void setLinkTrello(String linkTrello) {
         this.linkTrello = linkTrello;
+    }
+
+    public boolean isEnviado() {
+        return enviado;
+    }
+
+    public void setEnviado(boolean enviado) {
+        this.enviado = enviado;
+    }
+
+    public LocalDate getFechaEnvio() {
+        return fechaEnvio;
+    }
+
+    public void setFechaEnvio(LocalDate fechaEnvio) {
+        this.fechaEnvio = fechaEnvio;
     }
 }

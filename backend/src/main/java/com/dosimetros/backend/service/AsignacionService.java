@@ -299,6 +299,27 @@ public class AsignacionService {
         return v == null ? "" : v;
     }
 
+    // #18: asignaciones pendientes de envío (no despachadas).
+    public List<AsignacionResponse> pendientesEnvio(Integer ejecutivoId, String trimestre) {
+        String tri = (trimestre == null || trimestre.isBlank()) ? null : trimestre.trim();
+        return asignacionRepository.pendientesEnvio(ejecutivoId, tri)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // #18: marca un conjunto de asignaciones como enviadas (o revierte).
+    @Transactional
+    public int marcarEnvio(List<Integer> asignacionIds, boolean enviado) {
+        List<Asignacion> asignaciones = asignacionRepository.findAllById(asignacionIds);
+        for (Asignacion a : asignaciones) {
+            a.setEnviado(enviado);
+            a.setFechaEnvio(enviado ? LocalDate.now() : null);
+        }
+        asignacionRepository.saveAll(asignaciones);
+        return asignaciones.size();
+    }
+
     // #14 (Correcciones): busca asignaciones con filtros (admin) para corregir en lote.
     public List<AsignacionResponse> buscarAsignaciones(Integer clienteId, Integer ejecutivoId,
                                                        Integer empresaId, String trimestre,
@@ -366,7 +387,7 @@ public class AsignacionService {
     }
 
     private AsignacionResponse toResponse(Asignacion a) {
-        return new AsignacionResponse(
+        AsignacionResponse r = new AsignacionResponse(
                 a.getId(),
                 a.getDosimetro().getId(),
                 a.getDosimetro().getNumero(),
@@ -386,5 +407,8 @@ public class AsignacionService {
                 a.getFechaAsignacion(),
                 a.getLinkTrello()
         );
+        r.setEnviado(a.isEnviado());
+        r.setFechaEnvio(a.getFechaEnvio());
+        return r;
     }
 }

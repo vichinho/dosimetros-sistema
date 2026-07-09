@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -171,6 +172,35 @@ class AsignacionServiceTest {
         a.setDosimetro(dosimetro(id, "asignado", tipoDosimetroId));
         a.setLinkTrello("http://viejo");
         return a;
+    }
+
+    @Test
+    void marcarEnvioMarcaLasAsignacionesComoEnviadas() {
+        var a1 = asignacion(1, 2);
+        var a2 = asignacion(2, 2);
+        when(asignacionRepository.findAllById(List.of(1, 2))).thenReturn(List.of(a1, a2));
+        when(asignacionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        int n = service.marcarEnvio(List.of(1, 2), true);
+
+        assertEquals(2, n);
+        assertTrue(a1.isEnviado());
+        assertTrue(a2.isEnviado());
+        assertEquals(java.time.LocalDate.now(), a1.getFechaEnvio());
+    }
+
+    @Test
+    void marcarEnvioPuedeRevertir() {
+        var a1 = asignacion(1, 2);
+        a1.setEnviado(true);
+        a1.setFechaEnvio(java.time.LocalDate.now());
+        when(asignacionRepository.findAllById(List.of(1))).thenReturn(List.of(a1));
+        when(asignacionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.marcarEnvio(List.of(1), false);
+
+        assertEquals(false, a1.isEnviado());
+        assertEquals(null, a1.getFechaEnvio());
     }
 
     @Test

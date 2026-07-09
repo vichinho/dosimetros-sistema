@@ -6,6 +6,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
 import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.ImportacionAsignacionesResponse;
+import com.dosimetros.backend.dto.asignacion.MarcarEnvioRequest;
 import com.dosimetros.backend.service.AsignacionService;
 import com.dosimetros.backend.service.ImportacionAsignacionService;
 import jakarta.validation.Valid;
@@ -89,5 +90,21 @@ public class AsignacionController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<Integer> correccionMasiva(@Valid @RequestBody CorreccionMasivaRequest request) {
         return ResponseEntity.ok(service.correccionMasiva(request));
+    }
+
+    // #18: asignaciones pendientes de envío (admin/operador, con filtro de ejecutivo).
+    @GetMapping("/pendientes-envio")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<AsignacionResponse>> pendientesEnvio(
+            @RequestParam(required = false) Integer ejecutivoId,
+            @RequestParam(required = false) String trimestre) {
+        return ResponseEntity.ok(service.pendientesEnvio(ejecutivoId, trimestre));
+    }
+
+    // #18: marcar asignaciones como enviadas (o revertir).
+    @PatchMapping("/envio")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<Integer> marcarEnvio(@Valid @RequestBody MarcarEnvioRequest request) {
+        return ResponseEntity.ok(service.marcarEnvio(request.getAsignacionIds(), request.isEnviado()));
     }
 }

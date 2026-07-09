@@ -51,7 +51,30 @@ public class Asignacion {
     @Column(name = "link_trello", length = 500)
     private String linkTrello;
 
+    // #18: despacho físico. enviado=false => pendiente de envío.
+    @Column(name = "enviado", nullable = false)
+    private boolean enviado = false;
+
+    @Column(name = "fecha_envio")
+    private LocalDate fechaEnvio;
+
     public Asignacion() {
+    }
+
+    public boolean isEnviado() {
+        return enviado;
+    }
+
+    public void setEnviado(boolean enviado) {
+        this.enviado = enviado;
+    }
+
+    public LocalDate getFechaEnvio() {
+        return fechaEnvio;
+    }
+
+    public void setFechaEnvio(LocalDate fechaEnvio) {
+        this.fechaEnvio = fechaEnvio;
     }
 
     public Integer getId() {

@@ -17,6 +17,7 @@ import Usuarios from './pages/Usuarios'
 import MisDosimetros from './pages/MisDosimetros'
 import MisAsignaciones from './pages/MisAsignaciones'
 import MisClientes from './pages/MisClientes'
+import PendienteEnvio from './pages/PendienteEnvio'
 
 // Redirige a la pantalla inicial según el rol.
 function Home() {
@@ -45,6 +46,10 @@ export default function App() {
         <Route path="/armar" element={<ProtectedRoute roles={OPER}><Armar /></ProtectedRoute>} />
         <Route path="/asignar" element={<ProtectedRoute roles={OPER}><Asignar /></ProtectedRoute>} />
         <Route path="/dosimetros" element={<ProtectedRoute roles={OPER}><Dosimetros /></ProtectedRoute>} />
+        <Route
+          path="/pendiente-envio"
+          element={<ProtectedRoute roles={['ADMIN', 'OPERADOR', 'EJECUTIVO']}><PendienteEnvio /></ProtectedRoute>}
+        />
         <Route path="/buscar" element={<Navigate to="/dosimetros" replace />} />
         <Route path="/clientes" element={<ProtectedRoute roles={OPER}><Clientes /></ProtectedRoute>} />
         <Route path="/ejecutivos" element={<ProtectedRoute roles={OPER}><Ejecutivos /></ProtectedRoute>} />

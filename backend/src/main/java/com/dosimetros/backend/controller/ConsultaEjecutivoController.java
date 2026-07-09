@@ -83,6 +83,14 @@ public class ConsultaEjecutivoController {
                 .body(data);
     }
 
+    // #18: asignaciones del ejecutivo pendientes de envío (solo las suyas).
+    @GetMapping("/pendientes-envio")
+    public ResponseEntity<List<AsignacionResponse>> misPendientesEnvio(
+            @RequestParam(required = false) String trimestre) {
+        Integer ejecutivoId = currentUserService.requireEjecutivoId();
+        return ResponseEntity.ok(asignacionService.pendientesEnvio(ejecutivoId, trimestre));
+    }
+
     @GetMapping("/mis-filtros")
     public ResponseEntity<MisFiltrosResponse> misFiltros() {
         Integer ejecutivoId = currentUserService.requireEjecutivoId();

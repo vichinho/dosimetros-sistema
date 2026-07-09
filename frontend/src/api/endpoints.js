@@ -108,6 +108,12 @@ export const asignarIndividual = (data) =>
   client.post('/asignaciones', data).then((r) => r.data)
 export const buscarAsignaciones = (params) =>
   client.get('/asignaciones/buscar', { params }).then((r) => r.data)
+export const getPendientesEnvio = (params) =>
+  client.get('/asignaciones/pendientes-envio', { params }).then((r) => r.data)
+export const marcarEnvioAsignaciones = (data) =>
+  client.patch('/asignaciones/envio', data).then((r) => r.data)
+export const getMisPendientesEnvio = (params) =>
+  client.get('/ejecutivo/pendientes-envio', { params }).then((r) => r.data)
 export const correccionMasivaAsignaciones = (data) =>
   client.patch('/asignaciones/correccion-masiva', data).then((r) => r.data)
 export const getDisponiblesPorNumero = (numero) =>
