@@ -16,6 +16,9 @@ public interface ClienteRepository extends JpaRepository<Cliente, Integer> {
     // Búsqueda por nombre para el buscador del frontend
     List<Cliente> findByRazonSocialContainingIgnoreCaseAndActivoTrue(String razonSocial);
 
+    // Coincidencia exacta por razón social (carga de asignaciones por archivo, #12)
+    List<Cliente> findByRazonSocialIgnoreCaseAndActivoTrue(String razonSocial);
+
     // Clientes cuyo ejecutivo responsable es el indicado (HU #3 / #16)
     List<Cliente> findByEjecutivoIdAndActivoTrueOrderByRazonSocialAsc(Integer ejecutivoId);
 

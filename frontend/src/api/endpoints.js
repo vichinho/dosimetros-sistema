@@ -102,6 +102,11 @@ export const asignarIndividual = (data) =>
   client.post('/asignaciones', data).then((r) => r.data)
 export const getDisponiblesPorNumero = (numero) =>
   client.get('/dosimetros/disponible-por-numero', { params: { numero } }).then((r) => r.data)
+export const importarAsignacionesExcel = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return client.post('/asignaciones/importacion', formData).then((r) => r.data)
+}
 
 // --- Vistas del ejecutivo ---
 export const getMisClientes = () => client.get('/ejecutivo/mis-clientes').then((r) => r.data)

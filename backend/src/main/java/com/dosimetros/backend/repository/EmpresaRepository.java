@@ -8,4 +8,7 @@ import java.util.List;
 public interface EmpresaRepository extends JpaRepository<Empresa, Integer> {
 
     List<Empresa> findByActivaTrue();
+
+    // Coincidencia exacta por nombre (carga de asignaciones por archivo, #12)
+    List<Empresa> findByNombreIgnoreCaseAndActivaTrue(String nombre);
 }

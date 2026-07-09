@@ -4,11 +4,14 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.ImportacionAsignacionesResponse;
 import com.dosimetros.backend.service.AsignacionService;
+import com.dosimetros.backend.service.ImportacionAsignacionService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
@@ -19,9 +22,12 @@ import java.util.List;
 public class AsignacionController {
 
     private final AsignacionService service;
+    private final ImportacionAsignacionService importacionService;
 
-    public AsignacionController(AsignacionService service) {
+    public AsignacionController(AsignacionService service,
+                               ImportacionAsignacionService importacionService) {
         this.service = service;
+        this.importacionService = importacionService;
     }
 
     @GetMapping("/dosimetro/{dosimetroId}")
@@ -53,5 +59,13 @@ public class AsignacionController {
     public ResponseEntity<AsignacionMasivaResponse> asignarMasivo(
             @Valid @RequestBody AsignacionMasivaRequest request) {
         return ResponseEntity.status(201).body(service.asignarMasivo(request));
+    }
+
+    // #12: carga de asignaciones por archivo con upsert (clave = número).
+    @PostMapping("/importacion")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<ImportacionAsignacionesResponse> importarAsignaciones(
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(importacionService.importarExcel(file));
     }
 }

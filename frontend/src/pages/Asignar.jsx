@@ -8,6 +8,7 @@ import {
   getTiposPorta,
   getTareasDisponibles,
   getDisponiblesPorNumero,
+  importarAsignacionesExcel,
 } from '../api/endpoints'
 import { Card, Button, Input, Alert, Badge, EmptyState } from '../components/ui'
 import Combobox from '../components/Combobox'
@@ -53,6 +54,11 @@ export default function Asignar() {
   const [candidatos, setCandidatos] = useState(null) // null=sin buscar, []=sin resultados
   const [dosimetroSel, setDosimetroSel] = useState(null)
   const [resumenIndividual, setResumenIndividual] = useState(null)
+
+  // Por archivo (#12)
+  const [archivo, setArchivo] = useState(null)
+  const [subiendo, setSubiendo] = useState(false)
+  const [resultadoArchivo, setResultadoArchivo] = useState(null)
 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -255,6 +261,27 @@ export default function Asignar() {
     }
   }
 
+  const onImportarArchivo = async (e) => {
+    e.preventDefault()
+    setError('')
+    setResultadoArchivo(null)
+    if (!archivo) return setError('Selecciona un archivo .xlsx')
+    setSubiendo(true)
+    try {
+      const data = await importarAsignacionesExcel(archivo)
+      setResultadoArchivo(data)
+      toast.success(
+        `Asignaciones: ${data.creados} creadas, ${data.actualizados} actualizadas, ${data.sinCambios} sin cambios`
+      )
+    } catch (err) {
+      const msg = err.response?.data?.message || 'No se pudo procesar el archivo'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
   const tabBtn = (k, label) => (
     <button
       type="button"
@@ -272,9 +299,10 @@ export default function Asignar() {
       <div className="inline-flex rounded-lg border border-mist overflow-hidden">
         {tabBtn('masiva', 'Masiva (por tareas)')}
         {tabBtn('individual', 'Individual (por número)')}
+        {tabBtn('archivo', 'Por archivo')}
       </div>
 
-      <Card title="Datos de la asignación">{CamposComunes}</Card>
+      {vista !== 'archivo' && <Card title="Datos de la asignación">{CamposComunes}</Card>}
 
       {vista === 'masiva' && (
         <form onSubmit={onAsignarMasivo} className="space-y-6">
@@ -413,6 +441,54 @@ export default function Asignar() {
           {resumenIndividual && (
             <Card title="Resumen de la asignación">
               <ResumenAsignaciones asignaciones={[resumenIndividual]} />
+            </Card>
+          )}
+        </form>
+      )}
+
+      {vista === 'archivo' && (
+        <form onSubmit={onImportarArchivo} className="space-y-6">
+          <Card title="Cargar asignaciones desde archivo">
+            <p className="text-sm text-slate-500 mb-3">
+              Sube un <b>.xlsx</b> con las columnas: <b>numero_dosimetro, cliente, ejecutivo,
+              empresa, tipo_porta, trimestre, link_trello</b> (cliente/ejecutivo/empresa por
+              nombre). Se busca por <b>número de dosímetro</b>: si no tiene asignación se crea,
+              si algún dato cambió se actualiza y si es idéntica se deja igual. Los números
+              duplicados en el sistema o inexistentes se reportan como problema.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="file"
+                accept=".xlsx"
+                onChange={(e) => setArchivo(e.target.files[0])}
+                className="block text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-steel file:text-white hover:file:bg-steel/90"
+              />
+              <Button type="submit" disabled={subiendo}>
+                {subiendo ? 'Procesando…' : 'Cargar asignaciones'}
+              </Button>
+            </div>
+          </Card>
+
+          {error && <Alert type="error">{error}</Alert>}
+
+          {resultadoArchivo && (
+            <Card title="Resultado de la carga">
+              <div className="flex flex-wrap gap-4 text-sm mb-3">
+                <span>Total filas: <b>{resultadoArchivo.totalFilas}</b></span>
+                <span className="text-emerald-600">Creadas: <b>{resultadoArchivo.creados}</b></span>
+                <span className="text-steel">Actualizadas: <b>{resultadoArchivo.actualizados}</b></span>
+                <span className="text-ink/60">Sin cambios: <b>{resultadoArchivo.sinCambios}</b></span>
+                <span className="text-red-600">Con problemas: <b>{resultadoArchivo.fallidas}</b></span>
+              </div>
+              {resultadoArchivo.errores?.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-60 overflow-auto">
+                  <ul className="text-sm text-red-700 space-y-1">
+                    {resultadoArchivo.errores.map((msg, i) => (
+                      <li key={i}>{msg}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </Card>
           )}
         </form>
