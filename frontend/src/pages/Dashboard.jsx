@@ -14,8 +14,8 @@ import {
   Legend,
   Cell,
 } from 'recharts'
-import { getKpis } from '../api/endpoints'
-import { Card, Loading, Alert, EmptyState, Select, Modal, Badge } from '../components/ui'
+import { getKpis, getStockHistorico } from '../api/endpoints'
+import { Card, Loading, Alert, EmptyState, Select, Input, Modal, Badge } from '../components/ui'
 import { useToast } from '../components/Toast'
 
 // Barras de una sola serie: un solo tono (magnitud). La dona (identidad) usa varios.
@@ -125,6 +125,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [drill, setDrill] = useState(null)
+  // Stock histórico (#4): stock existente a una fecha dada.
+  const hoy = new Date().toISOString().slice(0, 10)
+  const [fechaHist, setFechaHist] = useState(hoy)
+  const [stockHist, setStockHist] = useState(null)
+  const [histLoading, setHistLoading] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
@@ -138,6 +143,20 @@ export default function Dashboard() {
       .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimestre])
+
+  // Stock histórico: se recarga al cambiar la fecha (con un pequeño debounce).
+  useEffect(() => {
+    if (!fechaHist) return
+    setHistLoading(true)
+    const t = setTimeout(() => {
+      getStockHistorico(fechaHist)
+        .then(setStockHist)
+        .catch(() => toast.error('No se pudo cargar el stock histórico'))
+        .finally(() => setHistLoading(false))
+    }, 250)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fechaHist])
 
   if (loading && !kpis) return <Loading label="Cargando dashboard…" />
 
@@ -218,9 +237,19 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-ink flex items-center gap-2">
+            Dashboard
+            {trimestre ? (
+              <Badge color="green">{trimestre}</Badge>
+            ) : (
+              <Badge color="slate">Todos los trimestres</Badge>
+            )}
+            {loading && kpis && (
+              <span className="text-xs font-normal text-steel animate-pulse">actualizando…</span>
+            )}
+          </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Resumen de stock y asignaciones · toca un indicador para ver el detalle
+            Las asignaciones se actualizan al trimestre seleccionado · toca un indicador para ver el detalle
           </p>
         </div>
         <div className="w-full sm:w-56">
@@ -295,21 +324,32 @@ export default function Dashboard() {
               )}
             </Card>
 
-            <Card title="Asignaciones por trimestre" className="lg:col-span-2">
-              {k.asignacionesPorTrimestre?.length > 0 ? (
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={k.asignacionesPorTrimestre} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID_STROKE} />
-                    <XAxis dataKey="clave" tick={AXIS_TICK} tickLine={false} axisLine={false} />
-                    <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} />
-                    <Tooltip {...tooltipStyle} />
-                    <Line type="monotone" dataKey="cantidad" stroke="#5b7065" strokeWidth={2.5} dot={{ r: 4, fill: '#5b7065' }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <EmptyState>Aún no hay asignaciones</EmptyState>
-              )}
-            </Card>
+            {(() => {
+              // Con un trimestre seleccionado se muestra su desglose por mes;
+              // sin filtro, la evolución por trimestre (#2/#3).
+              const porMes = trimestre && k.asignacionesPorMes?.length > 0
+              const serie = porMes ? k.asignacionesPorMes : k.asignacionesPorTrimestre
+              const titulo = porMes
+                ? `Asignaciones por mes · ${trimestre}`
+                : 'Asignaciones por trimestre'
+              return (
+                <Card title={titulo} className="lg:col-span-2">
+                  {serie?.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <LineChart data={serie} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID_STROKE} />
+                        <XAxis dataKey="clave" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                        <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                        <Tooltip {...tooltipStyle} />
+                        <Line type="monotone" dataKey="cantidad" stroke="#5b7065" strokeWidth={2.5} dot={{ r: 4, fill: '#5b7065' }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <EmptyState>{porMes ? 'Sin asignaciones en este trimestre' : 'Aún no hay asignaciones'}</EmptyState>
+                  )}
+                </Card>
+              )
+            })()}
           </div>
 
           {/* Desgloses */}
@@ -324,6 +364,44 @@ export default function Dashboard() {
             <BarPanel title={`Asignaciones por ejecutivo${sufijo}`} data={k.asignacionesPorEjecutivo} horizontal />
             <BarPanel title={`Top 3 clientes${sufijo}`} data={top3} horizontal />
           </div>
+
+          {/* Stock histórico por fecha (#4) */}
+          <Card title="Stock histórico por fecha">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-4">
+              <div className="w-full sm:w-56">
+                <Input
+                  label="Stock existente al"
+                  type="date"
+                  max={hoy}
+                  value={fechaHist}
+                  onChange={(e) => setFechaHist(e.target.value)}
+                />
+              </div>
+              <p className="text-sm text-ink/60 pb-2">
+                Dosímetros que ya existían en el inventario a esa fecha, según su
+                fecha de ingreso.
+                {stockHist && (
+                  <>
+                    {' '}Total: <b className="text-ink">{stockHist.total}</b>
+                    {histLoading && <span className="text-steel animate-pulse"> · actualizando…</span>}
+                  </>
+                )}
+              </p>
+            </div>
+            {stockHist?.porPorta?.length > 0 ? (
+              <ResponsiveContainer width="100%" height={Math.max(220, stockHist.porPorta.length * 40)}>
+                <BarChart data={stockHist.porPorta} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={GRID_STROKE} />
+                  <XAxis type="number" allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="clave" width={150} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                  <Tooltip {...tooltipStyle} cursor={{ fill: '#e2e6e0' }} />
+                  <Bar dataKey="cantidad" fill={BAR_FILL} radius={[0, 6, 6, 0]} maxBarSize={26} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState>Sin stock a esa fecha</EmptyState>
+            )}
+          </Card>
         </>
       )}
 

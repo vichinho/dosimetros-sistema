@@ -118,6 +118,22 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
     """)
     List<Object[]> tareasConDisponibles(@Param("tipoDosimetroId") Integer tipoDosimetroId);
 
+    // HU dashboard #4: stock histórico. Dosímetros que ya existían a una fecha
+    // (fecha_creacion <= fecha), agrupados por tipo de porta. Los que aún no
+    // tenían porta se reportan como "Sin armar".
+    @Query("""
+        SELECT COALESCE(tp.nombre, 'Sin armar'), COUNT(d)
+        FROM Dosimetro d LEFT JOIN d.tipoPorta tp
+        WHERE d.fechaCreacion <= :fecha
+        GROUP BY COALESCE(tp.nombre, 'Sin armar')
+        ORDER BY COUNT(d) DESC
+    """)
+    List<Object[]> stockHistoricoPorPorta(@Param("fecha") java.time.LocalDate fecha);
+
+    // Total de dosímetros existentes a una fecha (fecha_creacion <= fecha).
+    @Query("SELECT COUNT(d) FROM Dosimetro d WHERE d.fechaCreacion <= :fecha")
+    long contarExistentesHasta(@Param("fecha") java.time.LocalDate fecha);
+
     // Detalle de portas disponibles: porta + tipo de dosímetro + cantidad.
     @Query("""
         SELECT tp.id, tp.nombre, td.nombre, COUNT(d)

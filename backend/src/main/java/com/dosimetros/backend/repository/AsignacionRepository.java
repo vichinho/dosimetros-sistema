@@ -112,4 +112,15 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>
         ORDER BY SUBSTRING(a.trimestre, 3, 4) ASC, SUBSTRING(a.trimestre, 1, 1) ASC
     """)
     List<String> trimestresDistinct();
+
+    // HU dashboard #2/#3: al filtrar por un trimestre, desglose de sus
+    // asignaciones por MES (según la fecha de asignación), para que el gráfico
+    // temporal muestre los meses de ese trimestre y no todos los trimestres.
+    @Query("""
+        SELECT MONTH(a.fechaAsignacion), COUNT(a) FROM Asignacion a
+        WHERE a.trimestre = :trimestre
+        GROUP BY MONTH(a.fechaAsignacion)
+        ORDER BY MONTH(a.fechaAsignacion) ASC
+    """)
+    List<Object[]> contarPorMesEnTrimestre(@Param("trimestre") String trimestre);
 }
