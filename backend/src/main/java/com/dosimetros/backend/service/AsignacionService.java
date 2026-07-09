@@ -21,9 +21,15 @@ import com.dosimetros.backend.repository.DosimetroRepository;
 import com.dosimetros.backend.repository.EjecutivoRepository;
 import com.dosimetros.backend.repository.EmpresaRepository;
 import com.dosimetros.backend.repository.TipoPortaRepository;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -254,6 +260,43 @@ public class AsignacionService {
                 asignaciones.size(),
                 asignaciones
         );
+    }
+
+    /**
+     * #15: exporta una lista de asignaciones a Excel (.xlsx). Incluye la tarea.
+     */
+    public byte[] exportarAsignacionesExcel(List<AsignacionResponse> asignaciones) {
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Asignaciones");
+            String[] cab = {"N° dosímetro", "Cliente", "Ejecutivo", "Empresa", "Trimestre",
+                    "Fecha asignación", "Porta", "Tarea", "Bandeja", "Slot", "Link Trello"};
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < cab.length; i++) header.createCell(i).setCellValue(cab[i]);
+
+            int r = 1;
+            for (AsignacionResponse a : asignaciones) {
+                Row row = sheet.createRow(r++);
+                if (a.getNumeroDosimetro() != null) row.createCell(0).setCellValue(a.getNumeroDosimetro());
+                row.createCell(1).setCellValue(nvl(a.getClienteNombre()));
+                row.createCell(2).setCellValue(nvl(a.getEjecutivoNombre()));
+                row.createCell(3).setCellValue(nvl(a.getEmpresaNombre()));
+                row.createCell(4).setCellValue(nvl(a.getTrimestre()));
+                row.createCell(5).setCellValue(a.getFechaAsignacion() != null ? a.getFechaAsignacion().toString() : "");
+                row.createCell(6).setCellValue(nvl(a.getTipoPortaNombre()));
+                row.createCell(7).setCellValue(nvl(a.getNumeroTarea()));
+                if (a.getNumeroBandeja() != null) row.createCell(8).setCellValue(a.getNumeroBandeja());
+                if (a.getSlotBandeja() != null) row.createCell(9).setCellValue(a.getSlotBandeja());
+                row.createCell(10).setCellValue(nvl(a.getLinkTrello()));
+            }
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Error al generar el Excel de asignaciones", e);
+        }
+    }
+
+    private String nvl(String v) {
+        return v == null ? "" : v;
     }
 
     // #14 (Correcciones): busca asignaciones con filtros (admin) para corregir en lote.

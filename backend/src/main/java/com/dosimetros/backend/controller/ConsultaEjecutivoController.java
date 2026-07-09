@@ -8,6 +8,8 @@ import com.dosimetros.backend.service.AsignacionService;
 import com.dosimetros.backend.service.ClienteService;
 import com.dosimetros.backend.service.CurrentUserService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -58,6 +60,27 @@ public class ConsultaEjecutivoController {
         Integer ejecutivoId = currentUserService.requireEjecutivoId();
         return ResponseEntity.ok(asignacionService.filtrarPorEjecutivo(
                 ejecutivoId, clienteId, trimestre, fecha, tipoPortaId, numeroBandeja, slotBandeja, link));
+    }
+
+    // #15: exportar a Excel las asignaciones del ejecutivo (con los mismos filtros).
+    @GetMapping("/mis-asignaciones/export")
+    public ResponseEntity<byte[]> exportarMisAsignaciones(
+            @RequestParam(required = false) Integer clienteId,
+            @RequestParam(required = false) String trimestre,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam(required = false) Integer tipoPortaId,
+            @RequestParam(required = false) Integer numeroBandeja,
+            @RequestParam(required = false) Integer slotBandeja,
+            @RequestParam(required = false) String link) {
+        Integer ejecutivoId = currentUserService.requireEjecutivoId();
+        List<AsignacionResponse> asignaciones = asignacionService.filtrarPorEjecutivo(
+                ejecutivoId, clienteId, trimestre, fecha, tipoPortaId, numeroBandeja, slotBandeja, link);
+        byte[] data = asignacionService.exportarAsignacionesExcel(asignaciones);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"mis-asignaciones.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(data);
     }
 
     @GetMapping("/mis-filtros")

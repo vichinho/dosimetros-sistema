@@ -121,4 +121,8 @@ export const getMisClientes = () => client.get('/ejecutivo/mis-clientes').then((
 export const getMisAsignaciones = (params) =>
   client.get('/ejecutivo/mis-asignaciones', { params }).then((r) => r.data)
 export const getMisFiltros = () => client.get('/ejecutivo/mis-filtros').then((r) => r.data)
+export const exportarMisAsignacionesExcel = (params) =>
+  client
+    .get('/ejecutivo/mis-asignaciones/export', { params, responseType: 'blob' })
+    .then((r) => r.data)
 export const getMisLotes = () => client.get('/ejecutivo/mis-lotes').then((r) => r.data)
