@@ -20,6 +20,18 @@ public interface DosimetroRepository extends JpaRepository<Dosimetro, Integer> {
     // #7: dosímetros de una tarea ordenados por bandeja y slot (mapa de armado).
     List<Dosimetro> findByTareaIdOrderByNumeroBandejaAscSlotBandejaAsc(Integer tareaId);
 
+    // #7: resumen de armado por tarea. Armado = porta real (no null y no
+    // "Sin armar …"). Devuelve [tareaId, numeroTarea, total, armados].
+    @Query("""
+        SELECT t.id, t.numeroTarea, COUNT(d),
+               SUM(CASE WHEN tp.id IS NOT NULL AND LOWER(tp.nombre) NOT LIKE 'sin armar%'
+                        THEN 1 ELSE 0 END)
+        FROM Dosimetro d JOIN d.tarea t LEFT JOIN d.tipoPorta tp
+        GROUP BY t.id, t.numeroTarea
+        ORDER BY t.numeroTarea ASC
+    """)
+    List<Object[]> resumenArmadoPorTarea();
+
     boolean existsByNumero(Integer numero);
 
     // HU buscar: solo dosímetros que ya tienen al menos una asignación (fueron asignados)

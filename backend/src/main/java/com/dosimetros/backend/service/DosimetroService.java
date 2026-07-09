@@ -9,6 +9,7 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
 import com.dosimetros.backend.dto.dosimetro.MatrizCeldaResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
+import com.dosimetros.backend.dto.dosimetro.TareaArmadoResponse;
 import com.dosimetros.backend.dto.tarea.TareaDisponibleResponse;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -317,6 +318,17 @@ public class DosimetroService {
 
         dosimetroRepository.saveAll(dosimetros);
         return new ActualizarTipoPortaRangoResponse(dosimetros.size());
+    }
+
+    // #7: resumen de armado de todas las tareas (armadas / parciales / sin armar).
+    public List<TareaArmadoResponse> resumenArmadoPorTarea() {
+        return dosimetroRepository.resumenArmadoPorTarea().stream()
+                .map(o -> new TareaArmadoResponse(
+                        (Integer) o[0],
+                        (String) o[1],
+                        ((Number) o[2]).longValue(),
+                        o[3] == null ? 0L : ((Number) o[3]).longValue()))
+                .toList();
     }
 
     // #7: dosímetros de una tarea (mapa de bandejas/slots con estado de armado).

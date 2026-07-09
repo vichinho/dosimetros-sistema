@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   getTareas,
   getTiposPorta,
+  getResumenArmadoTareas,
   getDosimetrosDeTarea,
   actualizarTipoPortaRango,
   armarSeleccion,
@@ -55,6 +56,11 @@ export default function Armar() {
   const [cargandoMapa, setCargandoMapa] = useState(false)
   const [soloPendientes, setSoloPendientes] = useState(false)
 
+  // Resumen de armado de todas las tareas
+  const [resumen, setResumen] = useState([])
+  const [resumenFiltro, setResumenFiltro] = useState('todas') // todas | pendientes | armadas
+  const [busqueda, setBusqueda] = useState('')
+
   // Modo rápido (por rango de bandejas)
   const [rango, setRango] = useState({ desde: '', hasta: '', tipoPortaId: '' })
   const [armandoRango, setArmandoRango] = useState(false)
@@ -68,9 +74,12 @@ export default function Armar() {
   const [error, setError] = useState('')
   const toast = useToast()
 
+  const cargarResumen = () => getResumenArmadoTareas().then(setResumen).catch(() => {})
+
   useEffect(() => {
     getTareas().then(setTareas).catch(() => {})
     getTiposPorta().then(setPortas).catch(() => {})
+    cargarResumen()
   }, [])
 
   const cargarMapa = (id) => {
@@ -110,6 +119,27 @@ export default function Armar() {
   const totalPendientes = bandejas.reduce((a, b) => a + b.pendientes, 0)
   const totalArmados = bandejas.reduce((a, b) => a + b.armados, 0)
 
+  // Resumen de tareas: conteos y lista filtrada
+  const conteoResumen = useMemo(() => {
+    let armadas = 0, parciales = 0, sinArmar = 0
+    for (const t of resumen) {
+      if (t.estado === 'armada') armadas++
+      else if (t.estado === 'sin-armar') sinArmar++
+      else parciales++
+    }
+    return { armadas, parciales, sinArmar, total: resumen.length }
+  }, [resumen])
+
+  const resumenFiltrado = useMemo(() => {
+    const q = busqueda.trim().toLowerCase()
+    return resumen.filter((t) => {
+      if (resumenFiltro === 'armadas' && t.estado !== 'armada') return false
+      if (resumenFiltro === 'pendientes' && t.estado === 'armada') return false
+      if (q && !String(t.numeroTarea).toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [resumen, resumenFiltro, busqueda])
+
   const onArmarRango = async (e) => {
     e.preventDefault()
     setError('')
@@ -128,6 +158,7 @@ export default function Armar() {
       })
       toast.success(`${data.dosimetrosActualizados} dosímetros armados`)
       cargarMapa(tareaId)
+      cargarResumen()
     } catch (err) {
       const msg = err.response?.data?.message || 'No se pudo armar el rango'
       setError(msg)
@@ -170,6 +201,7 @@ export default function Armar() {
       toast.success(`${data.dosimetrosActualizados} dosímetros armados`)
       setBandejaAbierta(null)
       cargarMapa(tareaId)
+      cargarResumen()
     } catch (err) {
       toast.error(err.response?.data?.message || 'No se pudo armar la selección')
     } finally {
@@ -196,6 +228,87 @@ export default function Armar() {
             onChange={onSelectTarea}
           />
         </div>
+      </Card>
+
+      {/* Resumen de armado de todas las tareas (clickeable) */}
+      <Card
+        title="Estado de armado por tarea"
+        action={
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-emerald-600">{conteoResumen.armadas} armadas</span>
+            <span className="text-steel">{conteoResumen.parciales} parciales</span>
+            <span className="text-amber-600">{conteoResumen.sinArmar} sin armar</span>
+          </div>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <div className="inline-flex rounded-lg border border-mist overflow-hidden text-sm">
+            {[
+              { k: 'todas', l: 'Todas' },
+              { k: 'pendientes', l: 'Con pendientes' },
+              { k: 'armadas', l: 'Armadas' },
+            ].map((op) => (
+              <button
+                key={op.k}
+                type="button"
+                onClick={() => setResumenFiltro(op.k)}
+                className={`px-3 py-1.5 ${resumenFiltro === op.k ? 'bg-steel text-white' : 'bg-white text-ink/70 hover:bg-mist/20'}`}
+              >
+                {op.l}
+              </button>
+            ))}
+          </div>
+          <div className="w-48">
+            <Input placeholder="Buscar tarea…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+          </div>
+        </div>
+
+        {resumenFiltrado.length === 0 ? (
+          <EmptyState>No hay tareas con ese filtro.</EmptyState>
+        ) : (
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  <th className="py-2 font-medium">Tarea</th>
+                  <th className="py-2 font-medium w-40">Progreso</th>
+                  <th className="py-2 font-medium text-right">Armados</th>
+                  <th className="py-2 font-medium text-right">Pendientes</th>
+                  <th className="py-2 font-medium">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumenFiltrado.map((t) => {
+                  const est = ESTADO_BANDEJA[t.estado]
+                  const pct = t.total ? Math.round((t.armados / t.total) * 100) : 0
+                  const activa = String(t.tareaId) === String(tareaId)
+                  return (
+                    <tr
+                      key={t.tareaId}
+                      onClick={() => onSelectTarea(t.tareaId)}
+                      className={`border-b border-slate-100 cursor-pointer ${activa ? 'bg-steel/10' : 'hover:bg-mist/10'}`}
+                    >
+                      <td className="py-2 font-medium text-steel">{t.numeroTarea}</td>
+                      <td className="py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 rounded-full bg-mist/50 overflow-hidden">
+                            <div className="h-full bg-emerald-400" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-ink/50 w-9 text-right">{pct}%</span>
+                        </div>
+                      </td>
+                      <td className="py-2 text-right text-ink/80">{t.armados}/{t.total}</td>
+                      <td className="py-2 text-right">
+                        {t.pendientes > 0 ? <span className="text-amber-600 font-medium">{t.pendientes}</span> : <span className="text-slate-300">0</span>}
+                      </td>
+                      <td className="py-2"><Badge color={est.color}>{est.label}</Badge></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       {cargandoMapa && <Loading label="Cargando mapa de la tarea…" />}

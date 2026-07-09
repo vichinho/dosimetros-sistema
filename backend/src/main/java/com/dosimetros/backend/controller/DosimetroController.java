@@ -10,6 +10,7 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
 import com.dosimetros.backend.dto.dosimetro.MatrizCeldaResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
+import com.dosimetros.backend.dto.dosimetro.TareaArmadoResponse;
 import com.dosimetros.backend.dto.tarea.TareaDisponibleResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -144,6 +145,13 @@ public class DosimetroController {
     public ResponseEntity<ActualizarTipoPortaRangoResponse> actualizarTipoPortaPorRango(
             @Valid @RequestBody ActualizarTipoPortaRangoRequest request) {
         return ResponseEntity.ok(service.actualizarTipoPortaPorRango(request));
+    }
+
+    // #7: resumen de armado de todas las tareas.
+    @GetMapping("/tareas/resumen-armado")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<TareaArmadoResponse>> resumenArmado() {
+        return ResponseEntity.ok(service.resumenArmadoPorTarea());
     }
 
     // #7: dosímetros de una tarea (mapa de bandejas/slots con estado de armado).

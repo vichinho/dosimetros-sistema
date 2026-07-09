@@ -72,6 +72,8 @@ export const marcarBueno = (id) =>
   client.patch(`/dosimetros/${id}/bueno`).then((r) => r.data)
 export const actualizarTipoPortaRango = (data) =>
   client.patch('/dosimetros/rango-porta', data).then((r) => r.data)
+export const getResumenArmadoTareas = () =>
+  client.get('/dosimetros/tareas/resumen-armado').then((r) => r.data)
 export const getDosimetrosDeTarea = (tareaId) =>
   client.get(`/dosimetros/tareas/${tareaId}/dosimetros`).then((r) => r.data)
 export const armarSeleccion = (data) =>

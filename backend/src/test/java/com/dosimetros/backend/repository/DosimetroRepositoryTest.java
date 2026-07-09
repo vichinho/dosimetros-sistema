@@ -96,6 +96,25 @@ class DosimetroRepositoryTest {
     }
 
     @Test
+    void resumenArmadoCuentaSinArmarYNullComoPendientes() {
+        TipoDosimetro tld = tipoDosimetro("TLD");
+        TipoPorta gringo = tipoPorta("Porta gringo", tld);
+        TipoPorta sinArmar = tipoPorta("Sin armar (TLD)", tld);
+        Tarea t1 = tarea("1765");
+
+        dosimetro(1, tld, gringo, t1, "disponible");   // armado (porta real)
+        dosimetro(2, tld, sinArmar, t1, "disponible"); // pendiente (Sin armar)
+        dosimetro(3, tld, null, t1, "disponible");     // pendiente (sin porta)
+
+        List<Object[]> filas = dosimetroRepository.resumenArmadoPorTarea();
+
+        assertEquals(1, filas.size());
+        Object[] fila = filas.get(0);
+        assertEquals(3L, ((Number) fila[2]).longValue()); // total
+        assertEquals(1L, ((Number) fila[3]).longValue()); // armados (solo el de porta real)
+    }
+
+    @Test
     void matrizTareaPortaAgrupaPorTareaYPorta() {
         TipoDosimetro tld = tipoDosimetro("TLD");
         TipoPorta gringo = tipoPorta("Gringo", tld);
