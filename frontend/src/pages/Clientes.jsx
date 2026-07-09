@@ -133,38 +133,45 @@ export default function Clientes() {
         </form>
       </Card>
 
-      <Card title="Filtrar clientes">
-        <form
-          onSubmit={(e) => { e.preventDefault(); cargar() }}
-          className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
-        >
-          <Input
-            label="Buscar (razón social o fantasía)"
-            value={filtros.q}
-            onChange={(e) => setFiltros({ ...filtros, q: e.target.value })}
-            placeholder="Escribe y Enter…"
-          />
-          <Select label="Ejecutivo responsable" value={filtros.ejecutivoId} onChange={setFiltro('ejecutivoId')}>
-            <option value="">Todos</option>
-            {ejecutivos.map((ej) => (
-              <option key={ej.id} value={ej.id}>{ej.nombre}</option>
-            ))}
-          </Select>
-          <Select label="Empresa (con asignaciones)" value={filtros.empresaId} onChange={setFiltro('empresaId')}>
-            <option value="">Todas</option>
-            {empresas.map((em) => (
-              <option key={em.id} value={em.id}>{em.nombre}</option>
-            ))}
-          </Select>
-          <div className="flex gap-2">
-            <Button type="submit">Buscar</Button>
-            <Button
+      <Card
+        title="Filtrar clientes"
+        action={
+          (filtros.q || filtros.ejecutivoId || filtros.empresaId) && (
+            <button
               type="button"
-              variant="secondary"
               onClick={() => { const v = { q: '', ejecutivoId: '', empresaId: '' }; setFiltros(v); cargar(v) }}
+              className="text-sm text-steel hover:underline"
             >
-              Limpiar
-            </Button>
+              Limpiar filtros
+            </button>
+          )
+        }
+      >
+        <form onSubmit={(e) => { e.preventDefault(); cargar() }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="lg:col-span-2">
+              <Input
+                label="Buscar"
+                value={filtros.q}
+                onChange={(e) => setFiltros({ ...filtros, q: e.target.value })}
+                placeholder="Razón social o nombre fantasía…"
+              />
+            </div>
+            <Select label="Ejecutivo responsable" value={filtros.ejecutivoId} onChange={setFiltro('ejecutivoId')}>
+              <option value="">Todos los ejecutivos</option>
+              {ejecutivos.map((ej) => (
+                <option key={ej.id} value={ej.id}>{ej.nombre}</option>
+              ))}
+            </Select>
+            <Select label="Empresa (con asignaciones)" value={filtros.empresaId} onChange={setFiltro('empresaId')}>
+              <option value="">Todas las empresas</option>
+              {empresas.map((em) => (
+                <option key={em.id} value={em.id}>{em.nombre}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button type="submit">Buscar</Button>
           </div>
         </form>
       </Card>
