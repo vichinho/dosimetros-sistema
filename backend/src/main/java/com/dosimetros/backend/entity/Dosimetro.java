@@ -2,6 +2,8 @@ package com.dosimetros.backend.entity;
 
 import jakarta.persistence.*;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "dosimetro")
 public class Dosimetro {
@@ -37,7 +39,19 @@ public class Dosimetro {
     @Column(length = 500)
     private String observacion;
 
+    // Fecha en que el dosímetro ingresó al inventario. Permite consultar el
+    // stock histórico "a una fecha" (HU dashboard #4).
+    @Column(name = "fecha_creacion", nullable = false)
+    private LocalDate fechaCreacion;
+
     public Dosimetro() {
+    }
+
+    @PrePersist
+    void alCrear() {
+        if (fechaCreacion == null) {
+            fechaCreacion = LocalDate.now();
+        }
     }
 
     public Integer getId() {
@@ -110,5 +124,13 @@ public class Dosimetro {
 
     public void setObservacion(String observacion) {
         this.observacion = observacion;
+    }
+
+    public LocalDate getFechaCreacion() {
+        return fechaCreacion;
+    }
+
+    public void setFechaCreacion(LocalDate fechaCreacion) {
+        this.fechaCreacion = fechaCreacion;
     }
 }

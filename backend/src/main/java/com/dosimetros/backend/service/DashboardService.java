@@ -3,10 +3,12 @@ package com.dosimetros.backend.service;
 import com.dosimetros.backend.dto.dashboard.ConteoClaveResponse;
 import com.dosimetros.backend.dto.dashboard.ConteoResponse;
 import com.dosimetros.backend.dto.dashboard.DashboardKpisResponse;
+import com.dosimetros.backend.dto.dashboard.StockHistoricoResponse;
 import com.dosimetros.backend.repository.AsignacionRepository;
 import com.dosimetros.backend.repository.DosimetroRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -52,7 +54,39 @@ public class DashboardService {
         // La evolución por trimestre siempre muestra todos los trimestres.
         kpis.setAsignacionesPorTrimestre(mapearClave(asignacionRepository.contarPorTrimestre()));
 
+        // Al filtrar por un trimestre, se agrega el desglose por mes de ESE
+        // trimestre para que el gráfico temporal muestre sus meses (#2/#3).
+        if (filtro != null) {
+            kpis.setAsignacionesPorMes(mapearMeses(asignacionRepository.contarPorMesEnTrimestre(filtro)));
+        }
+
         return kpis;
+    }
+
+    /**
+     * Stock histórico (HU #4): dosímetros existentes en el inventario a una
+     * fecha dada, desglosados por tipo de porta.
+     */
+    public StockHistoricoResponse obtenerStockHistorico(LocalDate fecha) {
+        LocalDate corte = (fecha == null) ? LocalDate.now() : fecha;
+        long total = dosimetroRepository.contarExistentesHasta(corte);
+        List<ConteoClaveResponse> porPorta = mapearClave(dosimetroRepository.stockHistoricoPorPorta(corte));
+        return new StockHistoricoResponse(corte, total, porPorta);
+    }
+
+    private static final String[] MESES = {
+            "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+            "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
+    };
+
+    private List<ConteoClaveResponse> mapearMeses(List<Object[]> filas) {
+        return filas.stream()
+                .map(o -> {
+                    int mes = ((Number) o[0]).intValue(); // 1..12
+                    String etiqueta = (mes >= 1 && mes <= 12) ? MESES[mes - 1] : String.valueOf(mes);
+                    return new ConteoClaveResponse(etiqueta, (Long) o[1]);
+                })
+                .toList();
     }
 
     private long contarEstado(List<ConteoClaveResponse> porEstado, String estado) {
