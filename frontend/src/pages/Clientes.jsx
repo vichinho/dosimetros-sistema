@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   getClientes,
   crearCliente,
@@ -54,6 +54,18 @@ export default function Clientes() {
     getEmpresas().then(setEmpresas).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Búsqueda en vivo: recarga con un pequeño retardo mientras se escribe.
+  const primeraCarga = useRef(true)
+  useEffect(() => {
+    if (primeraCarga.current) {
+      primeraCarga.current = false
+      return
+    }
+    const t = setTimeout(() => cargar(filtros), 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtros.q])
 
   // Cambiar un select de filtro recarga de inmediato.
   const setFiltro = (campo) => (e) => {
@@ -154,7 +166,7 @@ export default function Clientes() {
                 label="Buscar"
                 value={filtros.q}
                 onChange={(e) => setFiltros({ ...filtros, q: e.target.value })}
-                placeholder="Razón social o nombre fantasía…"
+                placeholder="Escribe para filtrar por razón social o fantasía…"
               />
             </div>
             <Select label="Ejecutivo responsable" value={filtros.ejecutivoId} onChange={setFiltro('ejecutivoId')}>
@@ -169,9 +181,6 @@ export default function Clientes() {
                 <option key={em.id} value={em.id}>{em.nombre}</option>
               ))}
             </Select>
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button type="submit">Buscar</Button>
           </div>
         </form>
       </Card>
