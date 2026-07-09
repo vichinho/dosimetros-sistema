@@ -4,11 +4,16 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
+import com.dosimetros.backend.dto.asignacion.ImportacionAsignacionesResponse;
+import com.dosimetros.backend.dto.asignacion.MarcarEnvioRequest;
 import com.dosimetros.backend.service.AsignacionService;
+import com.dosimetros.backend.service.ImportacionAsignacionService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
@@ -19,9 +24,12 @@ import java.util.List;
 public class AsignacionController {
 
     private final AsignacionService service;
+    private final ImportacionAsignacionService importacionService;
 
-    public AsignacionController(AsignacionService service) {
+    public AsignacionController(AsignacionService service,
+                               ImportacionAsignacionService importacionService) {
         this.service = service;
+        this.importacionService = importacionService;
     }
 
     @GetMapping("/dosimetro/{dosimetroId}")
@@ -53,5 +61,52 @@ public class AsignacionController {
     public ResponseEntity<AsignacionMasivaResponse> asignarMasivo(
             @Valid @RequestBody AsignacionMasivaRequest request) {
         return ResponseEntity.status(201).body(service.asignarMasivo(request));
+    }
+
+    // #12: carga de asignaciones por archivo con upsert (clave = número).
+    @PostMapping("/importacion")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<ImportacionAsignacionesResponse> importarAsignaciones(
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(importacionService.importarExcel(file));
+    }
+
+    // #14 (Correcciones): buscar asignaciones con filtros para corregir en lote.
+    @GetMapping("/buscar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<AsignacionResponse>> buscarAsignaciones(
+            @RequestParam(required = false) Integer clienteId,
+            @RequestParam(required = false) Integer ejecutivoId,
+            @RequestParam(required = false) Integer empresaId,
+            @RequestParam(required = false) String trimestre,
+            @RequestParam(required = false) Integer tipoPortaId,
+            @RequestParam(required = false) String link) {
+        return ResponseEntity.ok(
+                service.buscarAsignaciones(clienteId, ejecutivoId, empresaId, trimestre, tipoPortaId, link));
+    }
+
+    // #14 (Correcciones): corregir un mismo campo en varias asignaciones a la vez.
+    @PatchMapping("/correccion-masiva")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<Integer> correccionMasiva(@Valid @RequestBody CorreccionMasivaRequest request) {
+        return ResponseEntity.ok(service.correccionMasiva(request));
+    }
+
+    // #18: asignaciones por estado de envío (admin/operador, con filtro de ejecutivo).
+    // enviado=false (por defecto) => pendientes; enviado=true => ya despachadas.
+    @GetMapping("/pendientes-envio")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<AsignacionResponse>> pendientesEnvio(
+            @RequestParam(required = false) Integer ejecutivoId,
+            @RequestParam(required = false) String trimestre,
+            @RequestParam(required = false, defaultValue = "false") boolean enviado) {
+        return ResponseEntity.ok(service.porEstadoEnvio(ejecutivoId, trimestre, enviado));
+    }
+
+    // #18: marcar asignaciones como enviadas (o revertir).
+    @PatchMapping("/envio")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<Integer> marcarEnvio(@Valid @RequestBody MarcarEnvioRequest request) {
+        return ResponseEntity.ok(service.marcarEnvio(request.getAsignacionIds(), request.isEnviado()));
     }
 }

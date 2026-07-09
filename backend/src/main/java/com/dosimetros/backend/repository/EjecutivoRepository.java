@@ -8,4 +8,7 @@ import java.util.List;
 public interface EjecutivoRepository extends JpaRepository<Ejecutivo, Integer> {
 
     List<Ejecutivo> findByActivoTrue();
+
+    // Coincidencia exacta por nombre (carga de asignaciones por archivo, #12)
+    List<Ejecutivo> findByNombreIgnoreCaseAndActivoTrue(String nombre);
 }

@@ -1,8 +1,10 @@
 package com.dosimetros.backend.service;
 
+import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.entity.Dosimetro;
 import com.dosimetros.backend.entity.TipoDosimetro;
+import com.dosimetros.backend.entity.TipoPorta;
 import com.dosimetros.backend.repository.AsignacionRepository;
 import com.dosimetros.backend.repository.DosimetroRepository;
 import com.dosimetros.backend.repository.TareaRepository;
@@ -10,6 +12,7 @@ import com.dosimetros.backend.repository.TipoDosimetroRepository;
 import com.dosimetros.backend.repository.TipoPortaRepository;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,12 +26,24 @@ import static org.mockito.Mockito.when;
 class DosimetroServiceTest {
 
     private final DosimetroRepository dosimetroRepository = mock(DosimetroRepository.class);
+    private final TipoPortaRepository tipoPortaRepository = mock(TipoPortaRepository.class);
     private final DosimetroService service = new DosimetroService(
             dosimetroRepository,
             mock(TipoDosimetroRepository.class),
-            mock(TipoPortaRepository.class),
+            tipoPortaRepository,
             mock(TareaRepository.class),
             mock(AsignacionRepository.class));
+
+    private TipoPorta porta(int id, int tipoDosimetroId) {
+        TipoDosimetro td = new TipoDosimetro();
+        td.setId(tipoDosimetroId);
+        td.setNombre("TLD");
+        TipoPorta tp = new TipoPorta();
+        tp.setId(id);
+        tp.setNombre("Gringo");
+        tp.setTipoDosimetro(td);
+        return tp;
+    }
 
     private Dosimetro dosimetro(String estado) {
         TipoDosimetro tipo = new TipoDosimetro();
@@ -80,5 +95,30 @@ class DosimetroServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> service.marcarBueno(1));
         verify(dosimetroRepository, never()).save(any());
+    }
+
+    @Test
+    void armarSeleccionAsignaLaPortaALosDosimetros() {
+        TipoPorta tp = porta(5, 2); // porta de tipo TLD (id 2)
+        Dosimetro d = dosimetro("disponible"); // dosímetro TLD (id 2)
+        when(tipoPortaRepository.findById(5)).thenReturn(Optional.of(tp));
+        when(dosimetroRepository.findAllById(List.of(1))).thenReturn(List.of(d));
+        when(dosimetroRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ActualizarTipoPortaRangoResponse resp = service.armarSeleccion(List.of(1), 5);
+
+        assertEquals(1, resp.getDosimetrosActualizados());
+        assertEquals(5, d.getTipoPorta().getId());
+    }
+
+    @Test
+    void armarSeleccionFallaSiLaPortaNoEsCompatible() {
+        TipoPorta tp = porta(5, 99); // porta de otro tipo de dosímetro
+        Dosimetro d = dosimetro("disponible"); // dosímetro TLD (id 2)
+        when(tipoPortaRepository.findById(5)).thenReturn(Optional.of(tp));
+        when(dosimetroRepository.findAllById(List.of(1))).thenReturn(List.of(d));
+
+        assertThrows(IllegalArgumentException.class, () -> service.armarSeleccion(List.of(1), 5));
+        verify(dosimetroRepository, never()).saveAll(any());
     }
 }

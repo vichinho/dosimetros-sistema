@@ -1,5 +1,6 @@
 package com.dosimetros.backend.service;
 
+import com.dosimetros.backend.dto.dosimetro.ActualizacionStockResponse;
 import com.dosimetros.backend.dto.dosimetro.ImportacionDosimetrosResponse;
 import com.dosimetros.backend.entity.Dosimetro;
 import com.dosimetros.backend.entity.Tarea;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -66,35 +68,30 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
         this.tareaRepository = tareaRepository;
     }
 
+    // Datos de una fila ya parseados y resueltos a entidades.
+    private record FilaParseada(int numero, TipoDosimetro tipoDosimetro, TipoPorta tipoPorta,
+                                Tarea tarea, Integer numeroBandeja, Integer slotBandeja) {
+    }
+
     @Override
     @Transactional
     public ImportacionDosimetrosResponse importarExcel(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Debe enviar un archivo Excel");
-        }
-        if (file.getOriginalFilename() == null ||
-                !file.getOriginalFilename().toLowerCase().endsWith(".xlsx")) {
-            throw new IllegalArgumentException("Solo se permiten archivos .xlsx");
-        }
+        validarArchivo(file);
 
         ImportacionDosimetrosResponse response = new ImportacionDosimetrosResponse();
         List<String> errores = new ArrayList<>();
         int exitosas = 0;
         int fallidas = 0;
         int omitidas = 0;
-        // Para detectar números repetidos dentro del mismo archivo.
         Set<Integer> numerosEnArchivo = new HashSet<>();
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
             DataFormatter formatter = new DataFormatter();
-
             int totalFilas = 0;
 
             for (Row row : sheet) {
                 if (row.getRowNum() == 0) continue; // saltar encabezado
-
-                // Ignorar filas completamente vacías
                 if (esFilaVacia(row)) continue;
 
                 totalFilas++;
@@ -102,101 +99,27 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                     throw new IllegalArgumentException(
                             "El archivo supera el máximo de " + MAX_FILAS + " filas permitidas");
                 }
-                int fila = row.getRowNum() + 1; // numero legible para errores (1-based)
+                int fila = row.getRowNum() + 1;
 
                 try {
-                    // --- NUMDOSIM (obligatorio) ---
-                    String numDosimStr = formatter.formatCellValue(row.getCell(COL_NUMDOSIM)).trim();
-                    if (numDosimStr.isBlank()) {
-                        throw new IllegalArgumentException("NUMDOSIM vacío");
-                    }
-                    int numeroDosimetro;
-                    try {
-                        numeroDosimetro = (int) Double.parseDouble(numDosimStr);
-                    } catch (NumberFormatException e) {
-                        throw new IllegalArgumentException("NUMDOSIM no es un número válido: '" + numDosimStr + "'");
-                    }
+                    FilaParseada f = parseFila(row, formatter);
 
-                    // --- Validación de duplicados ---
                     // Mismo número repetido dentro del archivo.
-                    if (!numerosEnArchivo.add(numeroDosimetro)) {
+                    if (!numerosEnArchivo.add(f.numero())) {
                         omitidas++;
-                        errores.add("Fila " + fila + ": número " + numeroDosimetro
+                        errores.add("Fila " + fila + ": número " + f.numero()
                                 + " repetido dentro del archivo (omitido)");
                         continue;
                     }
                     // Número ya existente en el sistema: no se duplica el dosímetro.
-                    // (La reasignación entre trimestres se maneja por asignaciones.)
-                    if (dosimetroRepository.existsByNumero(numeroDosimetro)) {
+                    if (dosimetroRepository.existsByNumero(f.numero())) {
                         omitidas++;
-                        errores.add("Fila " + fila + ": número " + numeroDosimetro
+                        errores.add("Fila " + fila + ": número " + f.numero()
                                 + " ya existe en el sistema (omitido, no se duplica)");
                         continue;
                     }
 
-                    // --- TIPO_DOSIMETRO (obligatorio) ---
-                    String tipoDosimNombre = formatter.formatCellValue(row.getCell(COL_TIPO_DOSIMETRO)).trim();
-                    if (tipoDosimNombre.isBlank()) {
-                        throw new IllegalArgumentException("TIPO_DOSIMETRO vacío");
-                    }
-                    TipoDosimetro tipoDosimetro = tipoDosimetroRepository.findByNombre(tipoDosimNombre)
-                            .orElseThrow(() -> new IllegalArgumentException(
-                                    "Tipo de dosímetro no encontrado: '" + tipoDosimNombre + "'"));
-
-                    boolean esOSL = "OSL".equalsIgnoreCase(tipoDosimetro.getNombre());
-
-                    // --- TIPO_PORTA (opcional; si viene, debe ser compatible con el tipo) ---
-                    TipoPorta tipoPorta = null;
-                    String tipoPortaNombre = formatter.formatCellValue(row.getCell(COL_TIPO_PORTA)).trim();
-                    if (!tipoPortaNombre.isBlank()) {
-                        tipoPorta = tipoPortaRepository
-                                .findByNombreAndTipoDosimetroId(tipoPortaNombre, tipoDosimetro.getId())
-                                .orElseThrow(() -> new IllegalArgumentException(
-                                        "Tipo de porta '" + tipoPortaNombre + "' no compatible con '" + tipoDosimNombre + "'"));
-                    }
-
-                    // Los OSL se cargan sin tarea, bandeja ni slot.
-                    Tarea tarea = null;
-                    Integer numeroBandeja = null;
-                    Integer slotBandeja = null;
-                    if (!esOSL) {
-                        String numRepo = formatter.formatCellValue(row.getCell(COL_NUM_REPOSITORIO)).trim();
-                        if (!numRepo.isBlank()) {
-                            tarea = tareaRepository.findByNumeroTarea(numRepo)
-                                    .orElseGet(() -> {
-                                        Tarea nueva = new Tarea();
-                                        nueva.setNumeroTarea(numRepo);
-                                        nueva.setFechaCreacion(LocalDate.now());
-                                        return tareaRepository.save(nueva);
-                                    });
-                        }
-
-                        String bandStr = formatter.formatCellValue(row.getCell(COL_NUM_BANDEJA)).trim();
-                        if (!bandStr.isBlank()) {
-                            numeroBandeja = (int) Double.parseDouble(bandStr);
-                        }
-
-                        String slotStr = formatter.formatCellValue(row.getCell(COL_SLOT_BANDEJA)).trim();
-                        if (!slotStr.isBlank()) {
-                            slotBandeja = (int) Double.parseDouble(slotStr);
-                        }
-                    }
-
-                    // --- Crear dosímetro (los duplicados ya fueron filtrados) ---
-                    Dosimetro dosimetro = new Dosimetro();
-
-                    dosimetro.setNumero(numeroDosimetro);
-                    dosimetro.setTipoDosimetro(tipoDosimetro);
-                    dosimetro.setTipoPorta(tipoPorta);
-                    dosimetro.setTarea(tarea);
-                    dosimetro.setNumeroBandeja(numeroBandeja);
-                    dosimetro.setSlotBandeja(slotBandeja);
-                    dosimetro.setEstado("disponible");
-                    // Entran al inventario con la fecha de creación de su tarea.
-                    dosimetro.setFechaCreacion(
-                            tarea != null ? tarea.getFechaCreacion() : java.time.LocalDate.now());
-
-                    dosimetroRepository.save(dosimetro);
+                    dosimetroRepository.save(nuevoDosimetro(f));
                     exitosas++;
 
                 } catch (Exception e) {
@@ -217,6 +140,239 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
         return response;
     }
+
+    @Override
+    @Transactional
+    public ActualizacionStockResponse actualizarStockExcel(MultipartFile file) {
+        validarArchivo(file);
+
+        ActualizacionStockResponse response = new ActualizacionStockResponse();
+        List<String> errores = new ArrayList<>();
+        int creados = 0;
+        int actualizados = 0;
+        int sinCambios = 0;
+        int fallidas = 0;
+        Set<Integer> numerosEnArchivo = new HashSet<>();
+
+        try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = workbook.getSheetAt(0);
+            DataFormatter formatter = new DataFormatter();
+            int totalFilas = 0;
+
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue;
+                if (esFilaVacia(row)) continue;
+
+                totalFilas++;
+                if (totalFilas > MAX_FILAS) {
+                    throw new IllegalArgumentException(
+                            "El archivo supera el máximo de " + MAX_FILAS + " filas permitidas");
+                }
+                int fila = row.getRowNum() + 1;
+
+                try {
+                    FilaParseada f = parseFila(row, formatter);
+
+                    if (!numerosEnArchivo.add(f.numero())) {
+                        fallidas++;
+                        errores.add("Fila " + fila + ": número " + f.numero()
+                                + " repetido dentro del archivo (omitido)");
+                        continue;
+                    }
+
+                    List<Dosimetro> existentes = dosimetroRepository.findByNumeroOrderByIdAsc(f.numero());
+
+                    if (existentes.isEmpty()) {
+                        // No existe → se crea (upsert: insert).
+                        dosimetroRepository.save(nuevoDosimetro(f));
+                        creados++;
+                    } else if (existentes.size() > 1) {
+                        // Número duplicado en el sistema: no se puede actualizar sin ambigüedad.
+                        fallidas++;
+                        errores.add("Fila " + fila + ": número " + f.numero() + " aparece "
+                                + existentes.size() + " veces en el sistema; no se actualiza automáticamente");
+                    } else {
+                        Dosimetro d = existentes.get(0);
+                        String estado = d.getEstado();
+                        boolean bloqueado = "asignado".equalsIgnoreCase(estado)
+                                || "baja".equalsIgnoreCase(estado);
+
+                        if (mismoArmado(d, f)) {
+                            sinCambios++;
+                        } else if (bloqueado) {
+                            fallidas++;
+                            errores.add("Fila " + fila + ": número " + f.numero() + " está " + estado
+                                    + "; no se actualiza su armado por archivo");
+                        } else {
+                            d.setTipoDosimetro(f.tipoDosimetro());
+                            d.setTipoPorta(f.tipoPorta());
+                            d.setTarea(f.tarea());
+                            d.setNumeroBandeja(f.numeroBandeja());
+                            d.setSlotBandeja(f.slotBandeja());
+                            dosimetroRepository.save(d);
+                            actualizados++;
+                        }
+                    }
+
+                } catch (Exception e) {
+                    fallidas++;
+                    errores.add("Fila " + fila + ": " + e.getMessage());
+                }
+            }
+
+            response.setTotalFilas(totalFilas);
+            response.setCreados(creados);
+            response.setActualizados(actualizados);
+            response.setSinCambios(sinCambios);
+            response.setFallidas(fallidas);
+            response.setErrores(errores);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error al leer el archivo Excel", e);
+        }
+
+        return response;
+    }
+
+    @Override
+    public byte[] plantillaExcel() {
+        String[] cabeceras = {"numero_dosimetro", "tipo_dosimetro", "tipo_porta",
+                "numero_tarea", "numero_bandeja", "slot_bandeja"};
+        // Fila de ejemplo ficticia para guiar el llenado.
+        String[] ejemplo = {"12345", "TLD", "Porta gringo", "1765", "3", "12"};
+
+        try (Workbook wb = new XSSFWorkbook();
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Carga");
+
+            Row header = sheet.createRow(0);
+            CellStyle negrita = wb.createCellStyle();
+            Font font = wb.createFont();
+            font.setBold(true);
+            negrita.setFont(font);
+            for (int i = 0; i < cabeceras.length; i++) {
+                Cell c = header.createCell(i);
+                c.setCellValue(cabeceras[i]);
+                c.setCellStyle(negrita);
+            }
+
+            Row fila = sheet.createRow(1);
+            for (int i = 0; i < ejemplo.length; i++) {
+                fila.createCell(i).setCellValue(ejemplo[i]);
+            }
+
+            for (int i = 0; i < cabeceras.length; i++) sheet.autoSizeColumn(i);
+
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Error al generar la plantilla", e);
+        }
+    }
+
+    // --- Helpers compartidos ---
+
+    private void validarArchivo(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Debe enviar un archivo Excel");
+        }
+        if (file.getOriginalFilename() == null ||
+                !file.getOriginalFilename().toLowerCase().endsWith(".xlsx")) {
+            throw new IllegalArgumentException("Solo se permiten archivos .xlsx");
+        }
+    }
+
+    /**
+     * Parsea y resuelve una fila a entidades. Crea la tarea si no existe.
+     * Lanza IllegalArgumentException con un mensaje claro ante datos inválidos.
+     */
+    private FilaParseada parseFila(Row row, DataFormatter formatter) {
+        String numDosimStr = formatter.formatCellValue(row.getCell(COL_NUMDOSIM)).trim();
+        if (numDosimStr.isBlank()) {
+            throw new IllegalArgumentException("NUMDOSIM vacío");
+        }
+        int numeroDosimetro;
+        try {
+            numeroDosimetro = (int) Double.parseDouble(numDosimStr);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("NUMDOSIM no es un número válido: '" + numDosimStr + "'");
+        }
+
+        String tipoDosimNombre = formatter.formatCellValue(row.getCell(COL_TIPO_DOSIMETRO)).trim();
+        if (tipoDosimNombre.isBlank()) {
+            throw new IllegalArgumentException("TIPO_DOSIMETRO vacío");
+        }
+        TipoDosimetro tipoDosimetro = tipoDosimetroRepository.findByNombre(tipoDosimNombre)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Tipo de dosímetro no encontrado: '" + tipoDosimNombre + "'"));
+
+        boolean esOSL = "OSL".equalsIgnoreCase(tipoDosimetro.getNombre());
+
+        TipoPorta tipoPorta = null;
+        String tipoPortaNombre = formatter.formatCellValue(row.getCell(COL_TIPO_PORTA)).trim();
+        if (!tipoPortaNombre.isBlank()) {
+            tipoPorta = tipoPortaRepository
+                    .findByNombreAndTipoDosimetroId(tipoPortaNombre, tipoDosimetro.getId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Tipo de porta '" + tipoPortaNombre + "' no compatible con '" + tipoDosimNombre + "'"));
+        }
+
+        Tarea tarea = null;
+        Integer numeroBandeja = null;
+        Integer slotBandeja = null;
+        if (!esOSL) {
+            String numRepo = formatter.formatCellValue(row.getCell(COL_NUM_REPOSITORIO)).trim();
+            if (!numRepo.isBlank()) {
+                tarea = tareaRepository.findByNumeroTarea(numRepo)
+                        .orElseGet(() -> {
+                            Tarea nueva = new Tarea();
+                            nueva.setNumeroTarea(numRepo);
+                            nueva.setFechaCreacion(LocalDate.now());
+                            return tareaRepository.save(nueva);
+                        });
+            }
+
+            String bandStr = formatter.formatCellValue(row.getCell(COL_NUM_BANDEJA)).trim();
+            if (!bandStr.isBlank()) {
+                numeroBandeja = (int) Double.parseDouble(bandStr);
+            }
+
+            String slotStr = formatter.formatCellValue(row.getCell(COL_SLOT_BANDEJA)).trim();
+            if (!slotStr.isBlank()) {
+                slotBandeja = (int) Double.parseDouble(slotStr);
+            }
+        }
+
+        return new FilaParseada(numeroDosimetro, tipoDosimetro, tipoPorta, tarea, numeroBandeja, slotBandeja);
+    }
+
+    private Dosimetro nuevoDosimetro(FilaParseada f) {
+        Dosimetro dosimetro = new Dosimetro();
+        dosimetro.setNumero(f.numero());
+        dosimetro.setTipoDosimetro(f.tipoDosimetro());
+        dosimetro.setTipoPorta(f.tipoPorta());
+        dosimetro.setTarea(f.tarea());
+        dosimetro.setNumeroBandeja(f.numeroBandeja());
+        dosimetro.setSlotBandeja(f.slotBandeja());
+        dosimetro.setEstado("disponible");
+        // Entran al inventario con la fecha de creación de su tarea.
+        dosimetro.setFechaCreacion(
+                f.tarea() != null ? f.tarea().getFechaCreacion() : LocalDate.now());
+        return dosimetro;
+    }
+
+    // ¿El dosímetro ya tiene exactamente el mismo armado que la fila del archivo?
+    private boolean mismoArmado(Dosimetro d, FilaParseada f) {
+        return Objects.equals(idOrNull(d.getTipoDosimetro()), f.tipoDosimetro().getId())
+                && Objects.equals(idOrNull(d.getTipoPorta()), idOrNull(f.tipoPorta()))
+                && Objects.equals(idOrNull(d.getTarea()), idOrNull(f.tarea()))
+                && Objects.equals(d.getNumeroBandeja(), f.numeroBandeja())
+                && Objects.equals(d.getSlotBandeja(), f.slotBandeja());
+    }
+
+    private Integer idOrNull(TipoDosimetro e) { return e == null ? null : e.getId(); }
+    private Integer idOrNull(TipoPorta e) { return e == null ? null : e.getId(); }
+    private Integer idOrNull(Tarea e) { return e == null ? null : e.getId(); }
 
     private boolean esFilaVacia(Row row) {
         if (row == null) return true;

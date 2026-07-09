@@ -59,6 +59,41 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>
     """)
     List<Object[]> portasDeEjecutivo(@Param("ejecutivoId") Integer ejecutivoId);
 
+    // #18: asignaciones por estado de envío (pendientes o enviadas), filtrables
+    // por ejecutivo y trimestre. El orden fino se hace en el frontend.
+    @Query("""
+        SELECT a FROM Asignacion a
+        WHERE a.enviado = :enviado
+          AND (:ejecutivoId IS NULL OR a.ejecutivo.id = :ejecutivoId)
+          AND (:trimestre IS NULL OR a.trimestre = :trimestre)
+        ORDER BY a.trimestre DESC, a.fechaAsignacion DESC, a.id DESC
+    """)
+    List<Asignacion> porEstadoEnvio(
+            @Param("ejecutivoId") Integer ejecutivoId,
+            @Param("trimestre") String trimestre,
+            @Param("enviado") boolean enviado
+    );
+
+    // #14 (Correcciones): asignaciones filtrables (admin), para corregir en lote.
+    @Query("""
+        SELECT a FROM Asignacion a
+        WHERE (:clienteId IS NULL OR a.cliente.id = :clienteId)
+          AND (:ejecutivoId IS NULL OR a.ejecutivo.id = :ejecutivoId)
+          AND (:empresaId IS NULL OR a.empresa.id = :empresaId)
+          AND (:trimestre IS NULL OR a.trimestre = :trimestre)
+          AND (:tipoPortaId IS NULL OR a.tipoPorta.id = :tipoPortaId)
+          AND (:link IS NULL OR LOWER(a.linkTrello) LIKE LOWER(CONCAT('%', :link, '%')))
+        ORDER BY a.trimestre DESC, a.fechaAsignacion DESC, a.id DESC
+    """)
+    List<Asignacion> filtrarAsignaciones(
+            @Param("clienteId") Integer clienteId,
+            @Param("ejecutivoId") Integer ejecutivoId,
+            @Param("empresaId") Integer empresaId,
+            @Param("trimestre") String trimestre,
+            @Param("tipoPortaId") Integer tipoPortaId,
+            @Param("link") String link
+    );
+
     // HU #17: KPIs de asignaciones (todos opcionalmente filtrados por trimestre)
     @Query("SELECT COUNT(a) FROM Asignacion a WHERE (:trimestre IS NULL OR a.trimestre = :trimestre)")
     long contarAsignaciones(@Param("trimestre") String trimestre);
@@ -112,4 +147,13 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>
         ORDER BY SUBSTRING(a.trimestre, 3, 4) ASC, SUBSTRING(a.trimestre, 1, 1) ASC
     """)
     List<String> trimestresDistinct();
+
+    // Asignaciones de un trimestre agrupadas por mes (1-12) de la fecha de asignación.
+    @Query("""
+        SELECT EXTRACT(MONTH FROM a.fechaAsignacion), COUNT(a) FROM Asignacion a
+        WHERE a.trimestre = :trimestre
+        GROUP BY EXTRACT(MONTH FROM a.fechaAsignacion)
+        ORDER BY EXTRACT(MONTH FROM a.fechaAsignacion)
+    """)
+    List<Object[]> contarPorMesEnTrimestre(@Param("trimestre") String trimestre);
 }

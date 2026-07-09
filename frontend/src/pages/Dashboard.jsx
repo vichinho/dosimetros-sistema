@@ -227,13 +227,23 @@ export default function Dashboard() {
         </div>
       ),
     },
+    clientes: {
+      title: `Clientes atendidos${sufijo}`,
+      content: <ConteoTabla filas={k.topClientes} etiqueta="Cliente" />,
+    },
     asignaciones: {
       title: `Asignaciones${sufijo}`,
       content: (
         <div className="space-y-6">
           <div>
-            <h4 className="text-sm font-semibold text-ink mb-2">Por trimestre</h4>
-            <ConteoTabla filas={k.asignacionesPorTrimestre} columna="clave" etiqueta="Trimestre" />
+            <h4 className="text-sm font-semibold text-ink mb-2">
+              {trimestre ? 'Por mes' : 'Por trimestre'}
+            </h4>
+            <ConteoTabla
+              filas={trimestre ? k.asignacionesPorMes : k.asignacionesPorTrimestre}
+              columna="clave"
+              etiqueta={trimestre ? 'Mes' : 'Trimestre'}
+            />
           </div>
           <div>
             <h4 className="text-sm font-semibold text-ink mb-2">Por tipo de porta{sufijo}</h4>
@@ -245,6 +255,11 @@ export default function Dashboard() {
   }
 
   const top3 = (k.topClientes || []).slice(0, 3)
+  // Conteos distintos del trimestre (las listas ya vienen filtradas del backend)
+  const nClientes = (k.topClientes || []).length
+  const nEmpresas = (k.asignacionesPorEmpresa || []).length
+  const nPortas = (k.asignacionesPorTipoPorta || []).length
+  const nEjecutivos = (k.asignacionesPorEjecutivo || []).length
 
   return (
     <div className="space-y-6">
@@ -252,27 +267,14 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Resumen de stock y asignaciones · toca un indicador para ver el detalle
+            {trimestre
+              ? `Asignaciones del trimestre ${trimestre}${meses ? ` (${meses})` : ''} · toca un indicador para ver el detalle`
+              : 'Resumen de stock y asignaciones · toca un indicador para ver el detalle'}
           </p>
-          <div className="flex items-center gap-2 mt-2">
-            {trimestre ? (
-              <Badge color="blue">
-                Asignaciones: {trimestre}
-                {meses ? ` · ${meses}` : ''}
-              </Badge>
-            ) : (
-              <Badge color="slate">Asignaciones: todos los trimestres</Badge>
-            )}
-            {actualizando && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-ink/50">
-                <Spinner className="w-3.5 h-3.5" /> actualizando…
-              </span>
-            )}
-          </div>
         </div>
         <div className="w-full sm:w-56">
           <Select
-            label="Filtrar asignaciones por trimestre"
+            label="Filtrar por trimestre"
             value={trimestre}
             onChange={(e) => setTrimestre(e.target.value)}
           >
@@ -287,33 +289,52 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {actualizando && (
+        <div className="inline-flex items-center gap-1.5 text-xs text-ink/50">
+          <Spinner className="w-3.5 h-3.5" /> actualizando datos del trimestre…
+        </div>
+      )}
+
       <Alert type="error">{error}</Alert>
 
       {kpis && (
         <>
-          {/* KPIs clicables */}
+          {/* KPIs clicables: cambian según haya o no un trimestre filtrado */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <KpiTile label="Total dosímetros" value={k.totalDosimetros} accent="bg-ink" onClick={() => setDrill('total')} />
-            <KpiTile
-              label="Disponibles"
-              value={k.disponibles}
-              sub={`${pct(k.disponibles, k.totalDosimetros)} del total`}
-              accent="bg-steel"
-              onClick={() => setDrill('disponibles')}
-            />
-            <KpiTile
-              label="Asignados"
-              value={k.asignados}
-              sub={`${pct(k.asignados, k.totalDosimetros)} del total`}
-              accent="bg-sun"
-              onClick={() => setDrill('asignados')}
-            />
-            <KpiTile label="Dañados" value={k.danados} accent="bg-[#7d9387]" onClick={() => setDrill('danados')} />
-            <KpiTile label={`Asignaciones${sufijo}`} value={k.totalAsignaciones} accent="bg-mist" onClick={() => setDrill('asignaciones')} />
+            {trimestre ? (
+              <>
+                <KpiTile label={`Asignaciones · ${trimestre}`} value={k.totalAsignaciones} accent="bg-mist" onClick={() => setDrill('asignaciones')} />
+                <KpiTile label="Clientes atendidos" value={nClientes} accent="bg-ink" onClick={() => setDrill('clientes')} />
+                <KpiTile label="Empresas" value={nEmpresas} accent="bg-steel" onClick={() => setDrill('asignados')} />
+                <KpiTile label="Portas usadas" value={nPortas} accent="bg-sun" onClick={() => setDrill('asignaciones')} />
+                <KpiTile label="Ejecutivos" value={nEjecutivos} accent="bg-[#7d9387]" onClick={() => setDrill('asignados')} />
+              </>
+            ) : (
+              <>
+                <KpiTile label="Total dosímetros" value={k.totalDosimetros} accent="bg-ink" onClick={() => setDrill('total')} />
+                <KpiTile
+                  label="Disponibles"
+                  value={k.disponibles}
+                  sub={`${pct(k.disponibles, k.totalDosimetros)} del total`}
+                  accent="bg-steel"
+                  onClick={() => setDrill('disponibles')}
+                />
+                <KpiTile
+                  label="Asignados"
+                  value={k.asignados}
+                  sub={`${pct(k.asignados, k.totalDosimetros)} del total`}
+                  accent="bg-sun"
+                  onClick={() => setDrill('asignados')}
+                />
+                <KpiTile label="Dañados" value={k.danados} accent="bg-[#7d9387]" onClick={() => setDrill('danados')} />
+                <KpiTile label="Asignaciones" value={k.totalAsignaciones} accent="bg-mist" onClick={() => setDrill('asignaciones')} />
+              </>
+            )}
           </div>
 
-          {/* Estado (dona) + evolución por trimestre */}
+          {/* Estado (dona, solo inventario) + evolución de asignaciones */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {!trimestre && (
             <Card title="Dosímetros por estado">
               {k.dosimetrosPorEstado?.length > 0 ? (
                 <ResponsiveContainer width="100%" height={260}>
@@ -344,28 +365,41 @@ export default function Dashboard() {
                 <EmptyState>Sin datos</EmptyState>
               )}
             </Card>
+            )}
 
-            <Card title="Asignaciones por trimestre" className="lg:col-span-2">
-              {k.asignacionesPorTrimestre?.length > 0 ? (
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={k.asignacionesPorTrimestre} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID_STROKE} />
-                    <XAxis dataKey="clave" tick={AXIS_TICK} tickLine={false} axisLine={false} />
-                    <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} />
-                    <Tooltip {...tooltipStyle} />
-                    <Line type="monotone" dataKey="cantidad" stroke="#5b7065" strokeWidth={2.5} dot={{ r: 4, fill: '#5b7065' }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <EmptyState>Aún no hay asignaciones</EmptyState>
-              )}
-            </Card>
+            {(() => {
+              const evolucion = trimestre ? k.asignacionesPorMes : k.asignacionesPorTrimestre
+              const tituloEvolucion = trimestre
+                ? `Asignaciones por mes${meses ? ` · ${meses}` : ''}`
+                : 'Asignaciones por trimestre'
+              return (
+                <Card title={tituloEvolucion} className={trimestre ? 'lg:col-span-3' : 'lg:col-span-2'}>
+                  {evolucion?.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <LineChart data={evolucion} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID_STROKE} />
+                        <XAxis dataKey="clave" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                        <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                        <Tooltip {...tooltipStyle} />
+                        <Line type="monotone" dataKey="cantidad" stroke="#5b7065" strokeWidth={2.5} dot={{ r: 4, fill: '#5b7065' }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <EmptyState>Aún no hay asignaciones</EmptyState>
+                  )}
+                </Card>
+              )
+            })()}
           </div>
 
           {/* Desgloses */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <BarPanel title="Disponibles por porta (estado de armado)" data={k.disponiblesPorPorta} />
-            <BarPanel title="Dosímetros por tipo" data={k.dosimetrosPorTipo} />
+            {!trimestre && (
+              <>
+                <BarPanel title="Disponibles por porta (estado de armado)" data={k.disponiblesPorPorta} />
+                <BarPanel title="Dosímetros por tipo" data={k.dosimetrosPorTipo} />
+              </>
+            )}
             <BarPanel title={`Asignaciones por empresa${sufijo}`} data={k.asignacionesPorEmpresa} />
             <BarPanel title={`Asignaciones por tipo de porta${sufijo}`} data={k.asignacionesPorTipoPorta} />
           </div>

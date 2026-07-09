@@ -42,10 +42,25 @@ export const getStock = (params) =>
 export const getDisponibles = () => client.get('/dosimetros/disponibles').then((r) => r.data)
 export const getPortasDisponibles = () =>
   client.get('/dosimetros/disponibles/portas').then((r) => r.data)
+export const getStockPortas = () =>
+  client.get('/dosimetros/stock/portas').then((r) => r.data)
+export const getStockMatriz = (params) =>
+  client.get('/dosimetros/stock/matriz', { params }).then((r) => r.data)
+export const actualizarStockExcel = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return client.post('/dosimetros/importacion/actualizar', formData).then((r) => r.data)
+}
+export const descargarPlantillaDosimetros = () =>
+  client.get('/dosimetros/importacion/plantilla', { responseType: 'blob' }).then((r) => r.data)
 export const exportarStockExcel = (params) =>
   client.get('/dosimetros/stock/export', { params, responseType: 'blob' }).then((r) => r.data)
 export const buscarDosimetro = (numero) =>
   client.get('/dosimetros/buscar', { params: { numero } }).then((r) => r.data)
+export const getDetalleDosimetros = (numero) =>
+  client.get('/dosimetros/detalle', { params: { numero } }).then((r) => r.data)
+export const editarEspecificaciones = (id, data) =>
+  client.patch(`/dosimetros/${id}/especificaciones`, data).then((r) => r.data)
 export const getDuplicados = () => client.get('/dosimetros/duplicados').then((r) => r.data)
 export const getHistorial = (id) =>
   client.get(`/dosimetros/${id}/historial`).then((r) => r.data)
@@ -63,9 +78,15 @@ export const marcarBueno = (id) =>
   client.patch(`/dosimetros/${id}/bueno`).then((r) => r.data)
 export const actualizarTipoPortaRango = (data) =>
   client.patch('/dosimetros/rango-porta', data).then((r) => r.data)
+export const getResumenArmadoTareas = () =>
+  client.get('/dosimetros/tareas/resumen-armado').then((r) => r.data)
+export const getDosimetrosDeTarea = (tareaId) =>
+  client.get(`/dosimetros/tareas/${tareaId}/dosimetros`).then((r) => r.data)
+export const armarSeleccion = (data) =>
+  client.patch('/dosimetros/porta-seleccion', data).then((r) => r.data)
 
 // --- Clientes ---
-export const getClientes = () => client.get('/clientes').then((r) => r.data)
+export const getClientes = (params) => client.get('/clientes', { params }).then((r) => r.data)
 export const crearCliente = (data) => client.post('/clientes', data).then((r) => r.data)
 export const actualizarCliente = (id, data) =>
   client.put(`/clientes/${id}`, data).then((r) => r.data)
@@ -83,10 +104,33 @@ export const desactivarEjecutivo = (id) => client.patch(`/ejecutivos/${id}/desac
 // --- Asignaciones ---
 export const asignarMasivo = (data) =>
   client.post('/asignaciones/masivo', data).then((r) => r.data)
+export const asignarIndividual = (data) =>
+  client.post('/asignaciones', data).then((r) => r.data)
+export const buscarAsignaciones = (params) =>
+  client.get('/asignaciones/buscar', { params }).then((r) => r.data)
+export const getPendientesEnvio = (params) =>
+  client.get('/asignaciones/pendientes-envio', { params }).then((r) => r.data)
+export const marcarEnvioAsignaciones = (data) =>
+  client.patch('/asignaciones/envio', data).then((r) => r.data)
+export const getMisPendientesEnvio = (params) =>
+  client.get('/ejecutivo/pendientes-envio', { params }).then((r) => r.data)
+export const correccionMasivaAsignaciones = (data) =>
+  client.patch('/asignaciones/correccion-masiva', data).then((r) => r.data)
+export const getDisponiblesPorNumero = (numero) =>
+  client.get('/dosimetros/disponible-por-numero', { params: { numero } }).then((r) => r.data)
+export const importarAsignacionesExcel = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return client.post('/asignaciones/importacion', formData).then((r) => r.data)
+}
 
 // --- Vistas del ejecutivo ---
 export const getMisClientes = () => client.get('/ejecutivo/mis-clientes').then((r) => r.data)
 export const getMisAsignaciones = (params) =>
   client.get('/ejecutivo/mis-asignaciones', { params }).then((r) => r.data)
 export const getMisFiltros = () => client.get('/ejecutivo/mis-filtros').then((r) => r.data)
+export const exportarMisAsignacionesExcel = (params) =>
+  client
+    .get('/ejecutivo/mis-asignaciones/export', { params, responseType: 'blob' })
+    .then((r) => r.data)
 export const getMisLotes = () => client.get('/ejecutivo/mis-lotes').then((r) => r.data)

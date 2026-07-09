@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import client from '../api/client'
+import { descargarPlantillaDosimetros } from '../api/endpoints'
 import { Card, Button, Alert } from '../components/ui'
 import { useToast } from '../components/Toast'
 
@@ -8,7 +9,25 @@ export default function Importar() {
   const [resultado, setResultado] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [descargando, setDescargando] = useState(false)
   const toast = useToast()
+
+  const descargarPlantilla = async () => {
+    setDescargando(true)
+    try {
+      const blob = await descargarPlantillaDosimetros()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'plantilla_carga_dosimetros.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('No se pudo descargar la plantilla')
+    } finally {
+      setDescargando(false)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -44,6 +63,14 @@ export default function Importar() {
             Sube un archivo <b>.xlsx</b> con la hoja de carga masiva (columnas: numero_dosimetro,
             tipo_dosimetro, tipo_porta, numero_tarea, numero_bandeja, slot_bandeja).
           </p>
+          <div>
+            <Button type="button" variant="secondary" onClick={descargarPlantilla} disabled={descargando}>
+              {descargando ? 'Descargando…' : 'Descargar plantilla de ejemplo'}
+            </Button>
+            <p className="text-xs text-slate-400 mt-1">
+              Incluye los encabezados y una fila de ejemplo ya rellenada.
+            </p>
+          </div>
           <input
             type="file"
             accept=".xlsx"

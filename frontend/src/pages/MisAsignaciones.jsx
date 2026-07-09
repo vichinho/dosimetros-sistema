@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { getMisAsignaciones, getMisFiltros } from '../api/endpoints'
+import { getMisAsignaciones, getMisFiltros, exportarMisAsignacionesExcel } from '../api/endpoints'
 import { Card, Select, Input, Button, Loading, EmptyState, Badge } from '../components/ui'
+import { useToast } from '../components/Toast'
 
 const LIMITE = 500
 
@@ -20,8 +21,35 @@ export default function MisAsignaciones() {
   const [asignaciones, setAsignaciones] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [exportando, setExportando] = useState(false)
+  const toast = useToast()
 
   const set = (campo) => (e) => setFiltros({ ...filtros, [campo]: e.target.value })
+
+  const paramsActivos = (f = filtros) => {
+    const params = {}
+    Object.entries(f).forEach(([k, v]) => {
+      if (v !== '' && v != null) params[k] = v
+    })
+    return params
+  }
+
+  const exportar = async () => {
+    setExportando(true)
+    try {
+      const blob = await exportarMisAsignacionesExcel(paramsActivos())
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'mis-asignaciones.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('No se pudo exportar')
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const cargar = (f = filtros) => {
     const params = {}
@@ -101,6 +129,11 @@ export default function MisAsignaciones() {
 
       <Card
         title={`Resultados (${asignaciones.length}${asignaciones.length > LIMITE ? `, mostrando ${LIMITE}` : ''})`}
+        action={
+          <Button variant="secondary" onClick={exportar} disabled={exportando || asignaciones.length === 0}>
+            {exportando ? 'Exportando…' : 'Exportar a Excel'}
+          </Button>
+        }
       >
         {loading ? (
           <Loading />
@@ -115,6 +148,7 @@ export default function MisAsignaciones() {
                   <th className="py-2 font-medium">Trimestre</th>
                   <th className="py-2 font-medium">Fecha asig.</th>
                   <th className="py-2 font-medium">Porta</th>
+                  <th className="py-2 font-medium">Tarea</th>
                   <th className="py-2 font-medium">Bandeja/Slot</th>
                   <th className="py-2 font-medium">Trello</th>
                 </tr>
@@ -128,6 +162,7 @@ export default function MisAsignaciones() {
                     <td className="py-2.5 text-slate-600">{a.trimestre}</td>
                     <td className="py-2.5 text-slate-600">{a.fechaAsignacion}</td>
                     <td className="py-2.5 text-slate-600">{a.tipoPortaNombre}</td>
+                    <td className="py-2.5 text-slate-600">{a.numeroTarea || '—'}</td>
                     <td className="py-2.5 text-slate-600">
                       {a.numeroBandeja != null ? `${a.numeroBandeja} / ${a.slotBandeja}` : '—'}
                     </td>

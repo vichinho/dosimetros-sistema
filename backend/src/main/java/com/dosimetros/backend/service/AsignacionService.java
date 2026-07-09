@@ -4,6 +4,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.LoteAsignacionResponse;
 import com.dosimetros.backend.dto.asignacion.MisFiltrosResponse;
 import com.dosimetros.backend.dto.asignacion.OpcionResponse;
@@ -20,9 +21,15 @@ import com.dosimetros.backend.repository.DosimetroRepository;
 import com.dosimetros.backend.repository.EjecutivoRepository;
 import com.dosimetros.backend.repository.EmpresaRepository;
 import com.dosimetros.backend.repository.TipoPortaRepository;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -255,8 +262,132 @@ public class AsignacionService {
         );
     }
 
+    /**
+     * #15: exporta una lista de asignaciones a Excel (.xlsx). Incluye la tarea.
+     */
+    public byte[] exportarAsignacionesExcel(List<AsignacionResponse> asignaciones) {
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Asignaciones");
+            String[] cab = {"N° dosímetro", "Cliente", "Ejecutivo", "Empresa", "Trimestre",
+                    "Fecha asignación", "Porta", "Tarea", "Bandeja", "Slot", "Link Trello"};
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < cab.length; i++) header.createCell(i).setCellValue(cab[i]);
+
+            int r = 1;
+            for (AsignacionResponse a : asignaciones) {
+                Row row = sheet.createRow(r++);
+                if (a.getNumeroDosimetro() != null) row.createCell(0).setCellValue(a.getNumeroDosimetro());
+                row.createCell(1).setCellValue(nvl(a.getClienteNombre()));
+                row.createCell(2).setCellValue(nvl(a.getEjecutivoNombre()));
+                row.createCell(3).setCellValue(nvl(a.getEmpresaNombre()));
+                row.createCell(4).setCellValue(nvl(a.getTrimestre()));
+                row.createCell(5).setCellValue(a.getFechaAsignacion() != null ? a.getFechaAsignacion().toString() : "");
+                row.createCell(6).setCellValue(nvl(a.getTipoPortaNombre()));
+                row.createCell(7).setCellValue(nvl(a.getNumeroTarea()));
+                if (a.getNumeroBandeja() != null) row.createCell(8).setCellValue(a.getNumeroBandeja());
+                if (a.getSlotBandeja() != null) row.createCell(9).setCellValue(a.getSlotBandeja());
+                row.createCell(10).setCellValue(nvl(a.getLinkTrello()));
+            }
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Error al generar el Excel de asignaciones", e);
+        }
+    }
+
+    private String nvl(String v) {
+        return v == null ? "" : v;
+    }
+
+    // #18: asignaciones por estado de envío (enviado=false => pendientes).
+    public List<AsignacionResponse> porEstadoEnvio(Integer ejecutivoId, String trimestre, boolean enviado) {
+        String tri = (trimestre == null || trimestre.isBlank()) ? null : trimestre.trim();
+        return asignacionRepository.porEstadoEnvio(ejecutivoId, tri, enviado)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // #18: marca un conjunto de asignaciones como enviadas (o revierte).
+    @Transactional
+    public int marcarEnvio(List<Integer> asignacionIds, boolean enviado) {
+        List<Asignacion> asignaciones = asignacionRepository.findAllById(asignacionIds);
+        for (Asignacion a : asignaciones) {
+            a.setEnviado(enviado);
+            a.setFechaEnvio(enviado ? LocalDate.now() : null);
+        }
+        asignacionRepository.saveAll(asignaciones);
+        return asignaciones.size();
+    }
+
+    // #14 (Correcciones): busca asignaciones con filtros (admin) para corregir en lote.
+    public List<AsignacionResponse> buscarAsignaciones(Integer clienteId, Integer ejecutivoId,
+                                                       Integer empresaId, String trimestre,
+                                                       Integer tipoPortaId, String link) {
+        String tri = (trimestre == null || trimestre.isBlank()) ? null : trimestre.trim();
+        String lnk = (link == null || link.isBlank()) ? null : link.trim();
+        return asignacionRepository
+                .filtrarAsignaciones(clienteId, ejecutivoId, empresaId, tri, tipoPortaId, lnk)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * #14 (Correcciones): cambia un mismo campo en varias asignaciones a la vez.
+     * campo ∈ {linkTrello, clienteId, ejecutivoId, empresaId, tipoPortaId}.
+     */
+    @Transactional
+    public int correccionMasiva(CorreccionMasivaRequest request) {
+        List<Asignacion> asignaciones = asignacionRepository.findAllById(request.getAsignacionIds());
+        String campo = request.getCampo();
+        String valor = request.getValor();
+
+        // Resolver la entidad destino una sola vez cuando aplica.
+        Cliente cliente = null;
+        Ejecutivo ejecutivo = null;
+        Empresa empresa = null;
+        TipoPorta tipoPorta = null;
+        switch (campo) {
+            case "linkTrello" -> {
+                if (valor == null || valor.isBlank()) {
+                    throw new IllegalArgumentException("El link de Trello no puede quedar vacío");
+                }
+            }
+            case "clienteId" -> cliente = clienteRepository.findById(Integer.valueOf(valor))
+                    .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado con id: " + valor));
+            case "ejecutivoId" -> ejecutivo = ejecutivoRepository.findById(Integer.valueOf(valor))
+                    .orElseThrow(() -> new ResourceNotFoundException("Ejecutivo no encontrado con id: " + valor));
+            case "empresaId" -> empresa = empresaRepository.findById(Integer.valueOf(valor))
+                    .orElseThrow(() -> new ResourceNotFoundException("Empresa no encontrada con id: " + valor));
+            case "tipoPortaId" -> tipoPorta = tipoPortaRepository.findById(Integer.valueOf(valor))
+                    .orElseThrow(() -> new ResourceNotFoundException("Tipo de porta no encontrado con id: " + valor));
+            default -> throw new IllegalArgumentException("Campo no permitido para corrección: " + campo);
+        }
+
+        for (Asignacion a : asignaciones) {
+            switch (campo) {
+                case "linkTrello" -> a.setLinkTrello(valor.trim());
+                case "clienteId" -> a.setCliente(cliente);
+                case "ejecutivoId" -> a.setEjecutivo(ejecutivo);
+                case "empresaId" -> a.setEmpresa(empresa);
+                case "tipoPortaId" -> {
+                    if (!tipoPorta.getTipoDosimetro().getId()
+                            .equals(a.getDosimetro().getTipoDosimetro().getId())) {
+                        throw new IllegalArgumentException(
+                                "El tipo de porta '" + tipoPorta.getNombre()
+                                        + "' no es compatible con el dosímetro #" + a.getDosimetro().getNumero());
+                    }
+                    a.setTipoPorta(tipoPorta);
+                }
+            }
+        }
+        asignacionRepository.saveAll(asignaciones);
+        return asignaciones.size();
+    }
+
     private AsignacionResponse toResponse(Asignacion a) {
-        return new AsignacionResponse(
+        AsignacionResponse r = new AsignacionResponse(
                 a.getId(),
                 a.getDosimetro().getId(),
                 a.getDosimetro().getNumero(),
@@ -276,5 +407,8 @@ public class AsignacionService {
                 a.getFechaAsignacion(),
                 a.getLinkTrello()
         );
+        r.setEnviado(a.isEnviado());
+        r.setFechaEnvio(a.getFechaEnvio());
+        return r;
     }
 }

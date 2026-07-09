@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   getClientes,
   crearCliente,
   desactivarCliente,
   getEjecutivos,
+  getEmpresas,
   getAsignacionesPorCliente,
 } from '../api/endpoints'
 import {
@@ -24,23 +25,54 @@ const POR_PAGINA = 20
 export default function Clientes() {
   const [clientes, setClientes] = useState([])
   const [ejecutivos, setEjecutivos] = useState([])
+  const [empresas, setEmpresas] = useState([])
+  const [filtros, setFiltros] = useState({ q: '', ejecutivoId: '', empresaId: '' })
   const [form, setForm] = useState({ razonSocial: '', nombreCorto: '', ejecutivoId: '' })
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [detalle, setDetalle] = useState(null) // { cliente, asignaciones, loading }
   const toast = useToast()
 
-  const cargar = () =>
-    getClientes()
-      .then(setClientes)
+  const cargar = (f = filtros) => {
+    const params = {}
+    if (f.q) params.q = f.q
+    if (f.ejecutivoId) params.ejecutivoId = f.ejecutivoId
+    if (f.empresaId) params.empresaId = f.empresaId
+    setLoading(true)
+    return getClientes(params)
+      .then((data) => {
+        setClientes(data)
+        setPage(1)
+      })
       .catch(() => toast.error('No se pudieron cargar los clientes'))
       .finally(() => setLoading(false))
+  }
 
   useEffect(() => {
-    cargar()
+    cargar(filtros)
     getEjecutivos().then(setEjecutivos).catch(() => {})
+    getEmpresas().then(setEmpresas).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Búsqueda en vivo: recarga con un pequeño retardo mientras se escribe.
+  const primeraCarga = useRef(true)
+  useEffect(() => {
+    if (primeraCarga.current) {
+      primeraCarga.current = false
+      return
+    }
+    const t = setTimeout(() => cargar(filtros), 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtros.q])
+
+  // Cambiar un select de filtro recarga de inmediato.
+  const setFiltro = (campo) => (e) => {
+    const next = { ...filtros, [campo]: e.target.value }
+    setFiltros(next)
+    cargar(next)
+  }
 
   const handleCrear = async (e) => {
     e.preventDefault()
@@ -113,7 +145,47 @@ export default function Clientes() {
         </form>
       </Card>
 
-      <Card title={`Clientes activos (${clientes.length})`}>
+      <Card
+        title="Filtrar clientes"
+        action={
+          (filtros.q || filtros.ejecutivoId || filtros.empresaId) && (
+            <button
+              type="button"
+              onClick={() => { const v = { q: '', ejecutivoId: '', empresaId: '' }; setFiltros(v); cargar(v) }}
+              className="text-sm text-steel hover:underline"
+            >
+              Limpiar filtros
+            </button>
+          )
+        }
+      >
+        <form onSubmit={(e) => { e.preventDefault(); cargar() }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="lg:col-span-2">
+              <Input
+                label="Buscar"
+                value={filtros.q}
+                onChange={(e) => setFiltros({ ...filtros, q: e.target.value })}
+                placeholder="Escribe para filtrar por razón social o fantasía…"
+              />
+            </div>
+            <Select label="Ejecutivo responsable" value={filtros.ejecutivoId} onChange={setFiltro('ejecutivoId')}>
+              <option value="">Todos los ejecutivos</option>
+              {ejecutivos.map((ej) => (
+                <option key={ej.id} value={ej.id}>{ej.nombre}</option>
+              ))}
+            </Select>
+            <Select label="Empresa (con asignaciones)" value={filtros.empresaId} onChange={setFiltro('empresaId')}>
+              <option value="">Todas las empresas</option>
+              {empresas.map((em) => (
+                <option key={em.id} value={em.id}>{em.nombre}</option>
+              ))}
+            </Select>
+          </div>
+        </form>
+      </Card>
+
+      <Card title={`Clientes (${clientes.length})`}>
         {loading ? (
           <Loading />
         ) : (

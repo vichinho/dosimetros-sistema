@@ -7,7 +7,10 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
+import com.dosimetros.backend.dto.dosimetro.EditarEspecificacionesRequest;
+import com.dosimetros.backend.dto.dosimetro.MatrizCeldaResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
+import com.dosimetros.backend.dto.dosimetro.TareaArmadoResponse;
 import com.dosimetros.backend.dto.tarea.TareaDisponibleResponse;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -65,10 +68,12 @@ public class DosimetroService {
     }
 
     // HU #7: stock filtrado por tipo de dosímetro, estado de armado (tipo de
-    // porta, incluida "sin armar") y estado del dosímetro.
-    public List<DosimetroResponse> filtrarStock(Integer tipoDosimetroId, Integer tipoPortaId, String estado) {
-        String estadoFinal = (estado == null || estado.isBlank()) ? "disponible" : estado;
-        return dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, estadoFinal)
+    // porta, incluida "sin armar"), tarea y estado del dosímetro.
+    public List<DosimetroResponse> filtrarStock(Integer tipoDosimetroId, Integer tipoPortaId,
+                                                Integer tareaId, String estado) {
+        // Estado en blanco = todos los estados (coincide con la matriz de #6).
+        String estadoFinal = (estado == null || estado.isBlank()) ? null : estado;
+        return dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, tareaId, estadoFinal)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -89,10 +94,27 @@ public class DosimetroService {
                 .toList();
     }
 
+    // #5: TODAS las portas con su stock disponible, incluidas las que están en 0.
+    public List<PortaDisponibleResponse> stockTodasLasPortas() {
+        return dosimetroRepository.stockTodasLasPortas().stream()
+                .map(o -> new PortaDisponibleResponse(
+                        (Integer) o[0], (String) o[1], (String) o[2], (Long) o[3]))
+                .toList();
+    }
+
+    // #6: matriz tarea × porta para la vista dinámica de stock.
+    public List<MatrizCeldaResponse> matrizTareaPorta(Integer tipoDosimetroId, String estado) {
+        String estadoFinal = (estado == null || estado.isBlank()) ? null : estado;
+        return dosimetroRepository.matrizTareaPorta(estadoFinal, tipoDosimetroId).stream()
+                .map(o -> new MatrizCeldaResponse(
+                        (Integer) o[0], (String) o[1], (Integer) o[2], (String) o[3], (Long) o[4]))
+                .toList();
+    }
+
     // Exporta el stock filtrado a un archivo Excel (.xlsx).
     public byte[] exportarStockExcel(Integer tipoDosimetroId, Integer tipoPortaId, String estado) {
         String estadoFinal = (estado == null || estado.isBlank()) ? null : estado;
-        List<Dosimetro> dosimetros = dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, estadoFinal);
+        List<Dosimetro> dosimetros = dosimetroRepository.filtrar(tipoDosimetroId, tipoPortaId, null, estadoFinal);
 
         try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("Stock");
@@ -140,6 +162,39 @@ public class DosimetroService {
                     "No se encontraron dosímetros asignados con número: " + numero);
         }
         return dosimetros.stream().map(this::toDetalleResponse).toList();
+    }
+
+    // #14 (Edición): TODOS los dosímetros con un número (con o sin asignación).
+    public List<DosimetroDetalleResponse> detalleTodosPorNumero(Integer numero) {
+        List<Dosimetro> dosimetros = dosimetroRepository.findByNumeroOrderByIdAsc(numero);
+        if (dosimetros.isEmpty()) {
+            throw new ResourceNotFoundException("No se encontraron dosímetros con número: " + numero);
+        }
+        return dosimetros.stream().map(this::toDetalleResponse).toList();
+    }
+
+    /**
+     * #14 (Edición): actualiza las especificaciones del dosímetro (número, tipo,
+     * porta, observación) sin tocar tarea, bandeja ni slot.
+     */
+    @Transactional
+    public DosimetroResponse editarEspecificaciones(Integer id, EditarEspecificacionesRequest request) {
+        Dosimetro dosimetro = dosimetroRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
+
+        TipoDosimetro tipoDosimetro = tipoDosimetroRepository.findById(request.getTipoDosimetroId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de dosímetro no encontrado con id: " + request.getTipoDosimetroId()));
+
+        TipoPorta tipoPorta = resolverTipoPorta(request.getTipoPortaId(), tipoDosimetro);
+
+        dosimetro.setNumero(request.getNumero());
+        dosimetro.setTipoDosimetro(tipoDosimetro);
+        dosimetro.setTipoPorta(tipoPorta);
+        dosimetro.setObservacion(request.getObservacion());
+        // tarea, bandeja, slot y estado se conservan.
+
+        return toResponse(dosimetroRepository.save(dosimetro));
     }
 
     public DosimetroResponse obtenerPorId(Integer id) {
@@ -295,6 +350,57 @@ public class DosimetroService {
             d.setTipoPorta(tipoPorta);
         }
 
+        dosimetroRepository.saveAll(dosimetros);
+        return new ActualizarTipoPortaRangoResponse(dosimetros.size());
+    }
+
+    // #13 (individual): dosímetros disponibles con un número dado (para asignar uno concreto).
+    public List<DosimetroResponse> disponiblesPorNumero(Integer numero) {
+        return dosimetroRepository.findByNumeroOrderByIdAsc(numero).stream()
+                .filter(d -> "disponible".equalsIgnoreCase(d.getEstado()))
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // #7: resumen de armado de todas las tareas (armadas / parciales / sin armar).
+    public List<TareaArmadoResponse> resumenArmadoPorTarea() {
+        return dosimetroRepository.resumenArmadoPorTarea().stream()
+                .map(o -> new TareaArmadoResponse(
+                        (Integer) o[0],
+                        (String) o[1],
+                        ((Number) o[2]).longValue(),
+                        o[3] == null ? 0L : ((Number) o[3]).longValue()))
+                .toList();
+    }
+
+    // #7: dosímetros de una tarea (mapa de bandejas/slots con estado de armado).
+    public List<DosimetroResponse> dosimetrosDeTarea(Integer tareaId) {
+        return dosimetroRepository.findByTareaIdOrderByNumeroBandejaAscSlotBandejaAsc(tareaId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * #7 (modo preciso) — Arma una selección concreta de dosímetros: les asigna
+     * el tipo de porta indicado, validando compatibilidad con cada uno.
+     */
+    @Transactional
+    public ActualizarTipoPortaRangoResponse armarSeleccion(List<Integer> dosimetroIds, Integer tipoPortaId) {
+        TipoPorta tipoPorta = tipoPortaRepository.findById(tipoPortaId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de porta no encontrado con id: " + tipoPortaId));
+
+        List<Dosimetro> dosimetros = dosimetroRepository.findAllById(dosimetroIds);
+        for (Dosimetro d : dosimetros) {
+            if (!tipoPorta.getTipoDosimetro().getId().equals(d.getTipoDosimetro().getId())) {
+                throw new IllegalArgumentException(
+                        "El tipo de porta '" + tipoPorta.getNombre() +
+                        "' no es compatible con el dosímetro #" + d.getNumero() +
+                        " (tipo: " + d.getTipoDosimetro().getNombre() + ")");
+            }
+            d.setTipoPorta(tipoPorta);
+        }
         dosimetroRepository.saveAll(dosimetros);
         return new ActualizarTipoPortaRangoResponse(dosimetros.size());
     }

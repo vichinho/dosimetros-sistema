@@ -3,11 +3,15 @@ package com.dosimetros.backend.controller;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
 import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoRequest;
 import com.dosimetros.backend.dto.dosimetro.ActualizarTipoPortaRangoResponse;
+import com.dosimetros.backend.dto.dosimetro.ArmarSeleccionRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
+import com.dosimetros.backend.dto.dosimetro.EditarEspecificacionesRequest;
+import com.dosimetros.backend.dto.dosimetro.MatrizCeldaResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
+import com.dosimetros.backend.dto.dosimetro.TareaArmadoResponse;
 import com.dosimetros.backend.dto.tarea.TareaDisponibleResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -45,14 +49,38 @@ public class DosimetroController {
     public ResponseEntity<List<DosimetroResponse>> filtrarStock(
             @RequestParam(required = false) Integer tipoDosimetroId,
             @RequestParam(required = false) Integer tipoPortaId,
+            @RequestParam(required = false) Integer tareaId,
             @RequestParam(required = false) String estado) {
-        return ResponseEntity.ok(service.filtrarStock(tipoDosimetroId, tipoPortaId, estado));
+        return ResponseEntity.ok(service.filtrarStock(tipoDosimetroId, tipoPortaId, tareaId, estado));
     }
 
     @GetMapping("/buscar")
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<DosimetroDetalleResponse>> buscarPorNumero(@RequestParam Integer numero) {
         return ResponseEntity.ok(service.buscarDetallePorNumero(numero));
+    }
+
+    // #13 (individual): dosímetros disponibles con un número (para asignar uno concreto).
+    @GetMapping("/disponible-por-numero")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<DosimetroResponse>> disponiblesPorNumero(@RequestParam Integer numero) {
+        return ResponseEntity.ok(service.disponiblesPorNumero(numero));
+    }
+
+    // #14 (Edición): todos los dosímetros con un número (con o sin asignación).
+    @GetMapping("/detalle")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<DosimetroDetalleResponse>> detallePorNumero(@RequestParam Integer numero) {
+        return ResponseEntity.ok(service.detalleTodosPorNumero(numero));
+    }
+
+    // #14 (Edición): editar especificaciones (sin tarea/bandeja/slot).
+    @PatchMapping("/{id}/especificaciones")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<DosimetroResponse> editarEspecificaciones(
+            @PathVariable Integer id,
+            @Valid @RequestBody EditarEspecificacionesRequest request) {
+        return ResponseEntity.ok(service.editarEspecificaciones(id, request));
     }
 
     @GetMapping("/duplicados")
@@ -65,6 +93,22 @@ public class DosimetroController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<PortaDisponibleResponse>> portasDisponibles() {
         return ResponseEntity.ok(service.detallePortasDisponibles());
+    }
+
+    // #5: todas las portas, incluidas las que están en 0.
+    @GetMapping("/stock/portas")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<PortaDisponibleResponse>> stockTodasLasPortas() {
+        return ResponseEntity.ok(service.stockTodasLasPortas());
+    }
+
+    // #6: matriz tarea × porta para la vista dinámica.
+    @GetMapping("/stock/matriz")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<MatrizCeldaResponse>> stockMatriz(
+            @RequestParam(required = false) Integer tipoDosimetroId,
+            @RequestParam(required = false) String estado) {
+        return ResponseEntity.ok(service.matrizTareaPorta(tipoDosimetroId, estado));
     }
 
     @GetMapping("/tareas-disponibles")
@@ -125,6 +169,28 @@ public class DosimetroController {
     public ResponseEntity<ActualizarTipoPortaRangoResponse> actualizarTipoPortaPorRango(
             @Valid @RequestBody ActualizarTipoPortaRangoRequest request) {
         return ResponseEntity.ok(service.actualizarTipoPortaPorRango(request));
+    }
+
+    // #7: resumen de armado de todas las tareas.
+    @GetMapping("/tareas/resumen-armado")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<TareaArmadoResponse>> resumenArmado() {
+        return ResponseEntity.ok(service.resumenArmadoPorTarea());
+    }
+
+    // #7: dosímetros de una tarea (mapa de bandejas/slots con estado de armado).
+    @GetMapping("/tareas/{tareaId}/dosimetros")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<DosimetroResponse>> dosimetrosDeTarea(@PathVariable Integer tareaId) {
+        return ResponseEntity.ok(service.dosimetrosDeTarea(tareaId));
+    }
+
+    // #7 (modo preciso): arma una selección concreta de dosímetros.
+    @PatchMapping("/porta-seleccion")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<ActualizarTipoPortaRangoResponse> armarSeleccion(
+            @Valid @RequestBody ArmarSeleccionRequest request) {
+        return ResponseEntity.ok(service.armarSeleccion(request.getDosimetroIds(), request.getTipoPortaId()));
     }
 
     @PatchMapping("/{id}/liberar")
