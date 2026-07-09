@@ -55,6 +55,10 @@ export const exportarStockExcel = (params) =>
   client.get('/dosimetros/stock/export', { params, responseType: 'blob' }).then((r) => r.data)
 export const buscarDosimetro = (numero) =>
   client.get('/dosimetros/buscar', { params: { numero } }).then((r) => r.data)
+export const getDetalleDosimetros = (numero) =>
+  client.get('/dosimetros/detalle', { params: { numero } }).then((r) => r.data)
+export const editarEspecificaciones = (id, data) =>
+  client.patch(`/dosimetros/${id}/especificaciones`, data).then((r) => r.data)
 export const getDuplicados = () => client.get('/dosimetros/duplicados').then((r) => r.data)
 export const getHistorial = (id) =>
   client.get(`/dosimetros/${id}/historial`).then((r) => r.data)
@@ -100,6 +104,10 @@ export const asignarMasivo = (data) =>
   client.post('/asignaciones/masivo', data).then((r) => r.data)
 export const asignarIndividual = (data) =>
   client.post('/asignaciones', data).then((r) => r.data)
+export const buscarAsignaciones = (params) =>
+  client.get('/asignaciones/buscar', { params }).then((r) => r.data)
+export const correccionMasivaAsignaciones = (data) =>
+  client.patch('/asignaciones/correccion-masiva', data).then((r) => r.data)
 export const getDisponiblesPorNumero = (numero) =>
   client.get('/dosimetros/disponible-por-numero', { params: { numero } }).then((r) => r.data)
 export const importarAsignacionesExcel = (file) => {

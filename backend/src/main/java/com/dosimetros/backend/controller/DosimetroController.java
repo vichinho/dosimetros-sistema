@@ -8,6 +8,7 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
+import com.dosimetros.backend.dto.dosimetro.EditarEspecificacionesRequest;
 import com.dosimetros.backend.dto.dosimetro.MatrizCeldaResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
 import com.dosimetros.backend.dto.dosimetro.TareaArmadoResponse;
@@ -64,6 +65,22 @@ public class DosimetroController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<List<DosimetroResponse>> disponiblesPorNumero(@RequestParam Integer numero) {
         return ResponseEntity.ok(service.disponiblesPorNumero(numero));
+    }
+
+    // #14 (Edición): todos los dosímetros con un número (con o sin asignación).
+    @GetMapping("/detalle")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<DosimetroDetalleResponse>> detallePorNumero(@RequestParam Integer numero) {
+        return ResponseEntity.ok(service.detalleTodosPorNumero(numero));
+    }
+
+    // #14 (Edición): editar especificaciones (sin tarea/bandeja/slot).
+    @PatchMapping("/{id}/especificaciones")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<DosimetroResponse> editarEspecificaciones(
+            @PathVariable Integer id,
+            @Valid @RequestBody EditarEspecificacionesRequest request) {
+        return ResponseEntity.ok(service.editarEspecificaciones(id, request));
     }
 
     @GetMapping("/duplicados")

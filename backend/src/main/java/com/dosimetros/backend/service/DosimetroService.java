@@ -7,6 +7,7 @@ import com.dosimetros.backend.dto.dosimetro.DosimetroDetalleResponse;
 import com.dosimetros.backend.dto.dosimetro.DosimetroRequest;
 import com.dosimetros.backend.dto.dosimetro.DosimetroResponse;
 import com.dosimetros.backend.dto.dosimetro.DuplicadoResponse;
+import com.dosimetros.backend.dto.dosimetro.EditarEspecificacionesRequest;
 import com.dosimetros.backend.dto.dosimetro.MatrizCeldaResponse;
 import com.dosimetros.backend.dto.dosimetro.PortaDisponibleResponse;
 import com.dosimetros.backend.dto.dosimetro.TareaArmadoResponse;
@@ -161,6 +162,39 @@ public class DosimetroService {
                     "No se encontraron dosímetros asignados con número: " + numero);
         }
         return dosimetros.stream().map(this::toDetalleResponse).toList();
+    }
+
+    // #14 (Edición): TODOS los dosímetros con un número (con o sin asignación).
+    public List<DosimetroDetalleResponse> detalleTodosPorNumero(Integer numero) {
+        List<Dosimetro> dosimetros = dosimetroRepository.findByNumeroOrderByIdAsc(numero);
+        if (dosimetros.isEmpty()) {
+            throw new ResourceNotFoundException("No se encontraron dosímetros con número: " + numero);
+        }
+        return dosimetros.stream().map(this::toDetalleResponse).toList();
+    }
+
+    /**
+     * #14 (Edición): actualiza las especificaciones del dosímetro (número, tipo,
+     * porta, observación) sin tocar tarea, bandeja ni slot.
+     */
+    @Transactional
+    public DosimetroResponse editarEspecificaciones(Integer id, EditarEspecificacionesRequest request) {
+        Dosimetro dosimetro = dosimetroRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dosímetro no encontrado con id: " + id));
+
+        TipoDosimetro tipoDosimetro = tipoDosimetroRepository.findById(request.getTipoDosimetroId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de dosímetro no encontrado con id: " + request.getTipoDosimetroId()));
+
+        TipoPorta tipoPorta = resolverTipoPorta(request.getTipoPortaId(), tipoDosimetro);
+
+        dosimetro.setNumero(request.getNumero());
+        dosimetro.setTipoDosimetro(tipoDosimetro);
+        dosimetro.setTipoPorta(tipoPorta);
+        dosimetro.setObservacion(request.getObservacion());
+        // tarea, bandeja, slot y estado se conservan.
+
+        return toResponse(dosimetroRepository.save(dosimetro));
     }
 
     public DosimetroResponse obtenerPorId(Integer id) {

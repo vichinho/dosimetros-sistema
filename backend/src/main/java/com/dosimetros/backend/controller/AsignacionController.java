@@ -4,6 +4,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.ImportacionAsignacionesResponse;
 import com.dosimetros.backend.service.AsignacionService;
 import com.dosimetros.backend.service.ImportacionAsignacionService;
@@ -67,5 +68,26 @@ public class AsignacionController {
     public ResponseEntity<ImportacionAsignacionesResponse> importarAsignaciones(
             @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(importacionService.importarExcel(file));
+    }
+
+    // #14 (Correcciones): buscar asignaciones con filtros para corregir en lote.
+    @GetMapping("/buscar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<AsignacionResponse>> buscarAsignaciones(
+            @RequestParam(required = false) Integer clienteId,
+            @RequestParam(required = false) Integer ejecutivoId,
+            @RequestParam(required = false) Integer empresaId,
+            @RequestParam(required = false) String trimestre,
+            @RequestParam(required = false) Integer tipoPortaId,
+            @RequestParam(required = false) String link) {
+        return ResponseEntity.ok(
+                service.buscarAsignaciones(clienteId, ejecutivoId, empresaId, trimestre, tipoPortaId, link));
+    }
+
+    // #14 (Correcciones): corregir un mismo campo en varias asignaciones a la vez.
+    @PatchMapping("/correccion-masiva")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<Integer> correccionMasiva(@Valid @RequestBody CorreccionMasivaRequest request) {
+        return ResponseEntity.ok(service.correccionMasiva(request));
     }
 }

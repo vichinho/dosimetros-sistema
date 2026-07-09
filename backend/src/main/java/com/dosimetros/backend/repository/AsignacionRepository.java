@@ -59,6 +59,26 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>
     """)
     List<Object[]> portasDeEjecutivo(@Param("ejecutivoId") Integer ejecutivoId);
 
+    // #14 (Correcciones): asignaciones filtrables (admin), para corregir en lote.
+    @Query("""
+        SELECT a FROM Asignacion a
+        WHERE (:clienteId IS NULL OR a.cliente.id = :clienteId)
+          AND (:ejecutivoId IS NULL OR a.ejecutivo.id = :ejecutivoId)
+          AND (:empresaId IS NULL OR a.empresa.id = :empresaId)
+          AND (:trimestre IS NULL OR a.trimestre = :trimestre)
+          AND (:tipoPortaId IS NULL OR a.tipoPorta.id = :tipoPortaId)
+          AND (:link IS NULL OR LOWER(a.linkTrello) LIKE LOWER(CONCAT('%', :link, '%')))
+        ORDER BY a.trimestre DESC, a.fechaAsignacion DESC, a.id DESC
+    """)
+    List<Asignacion> filtrarAsignaciones(
+            @Param("clienteId") Integer clienteId,
+            @Param("ejecutivoId") Integer ejecutivoId,
+            @Param("empresaId") Integer empresaId,
+            @Param("trimestre") String trimestre,
+            @Param("tipoPortaId") Integer tipoPortaId,
+            @Param("link") String link
+    );
+
     // HU #17: KPIs de asignaciones (todos opcionalmente filtrados por trimestre)
     @Query("SELECT COUNT(a) FROM Asignacion a WHERE (:trimestre IS NULL OR a.trimestre = :trimestre)")
     long contarAsignaciones(@Param("trimestre") String trimestre);

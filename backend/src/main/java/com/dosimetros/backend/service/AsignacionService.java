@@ -4,6 +4,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.LoteAsignacionResponse;
 import com.dosimetros.backend.dto.asignacion.MisFiltrosResponse;
 import com.dosimetros.backend.dto.asignacion.OpcionResponse;
@@ -253,6 +254,72 @@ public class AsignacionService {
                 asignaciones.size(),
                 asignaciones
         );
+    }
+
+    // #14 (Correcciones): busca asignaciones con filtros (admin) para corregir en lote.
+    public List<AsignacionResponse> buscarAsignaciones(Integer clienteId, Integer ejecutivoId,
+                                                       Integer empresaId, String trimestre,
+                                                       Integer tipoPortaId, String link) {
+        String tri = (trimestre == null || trimestre.isBlank()) ? null : trimestre.trim();
+        String lnk = (link == null || link.isBlank()) ? null : link.trim();
+        return asignacionRepository
+                .filtrarAsignaciones(clienteId, ejecutivoId, empresaId, tri, tipoPortaId, lnk)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * #14 (Correcciones): cambia un mismo campo en varias asignaciones a la vez.
+     * campo ∈ {linkTrello, clienteId, ejecutivoId, empresaId, tipoPortaId}.
+     */
+    @Transactional
+    public int correccionMasiva(CorreccionMasivaRequest request) {
+        List<Asignacion> asignaciones = asignacionRepository.findAllById(request.getAsignacionIds());
+        String campo = request.getCampo();
+        String valor = request.getValor();
+
+        // Resolver la entidad destino una sola vez cuando aplica.
+        Cliente cliente = null;
+        Ejecutivo ejecutivo = null;
+        Empresa empresa = null;
+        TipoPorta tipoPorta = null;
+        switch (campo) {
+            case "linkTrello" -> {
+                if (valor == null || valor.isBlank()) {
+                    throw new IllegalArgumentException("El link de Trello no puede quedar vacío");
+                }
+            }
+            case "clienteId" -> cliente = clienteRepository.findById(Integer.valueOf(valor))
+                    .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado con id: " + valor));
+            case "ejecutivoId" -> ejecutivo = ejecutivoRepository.findById(Integer.valueOf(valor))
+                    .orElseThrow(() -> new ResourceNotFoundException("Ejecutivo no encontrado con id: " + valor));
+            case "empresaId" -> empresa = empresaRepository.findById(Integer.valueOf(valor))
+                    .orElseThrow(() -> new ResourceNotFoundException("Empresa no encontrada con id: " + valor));
+            case "tipoPortaId" -> tipoPorta = tipoPortaRepository.findById(Integer.valueOf(valor))
+                    .orElseThrow(() -> new ResourceNotFoundException("Tipo de porta no encontrado con id: " + valor));
+            default -> throw new IllegalArgumentException("Campo no permitido para corrección: " + campo);
+        }
+
+        for (Asignacion a : asignaciones) {
+            switch (campo) {
+                case "linkTrello" -> a.setLinkTrello(valor.trim());
+                case "clienteId" -> a.setCliente(cliente);
+                case "ejecutivoId" -> a.setEjecutivo(ejecutivo);
+                case "empresaId" -> a.setEmpresa(empresa);
+                case "tipoPortaId" -> {
+                    if (!tipoPorta.getTipoDosimetro().getId()
+                            .equals(a.getDosimetro().getTipoDosimetro().getId())) {
+                        throw new IllegalArgumentException(
+                                "El tipo de porta '" + tipoPorta.getNombre()
+                                        + "' no es compatible con el dosímetro #" + a.getDosimetro().getNumero());
+                    }
+                    a.setTipoPorta(tipoPorta);
+                }
+            }
+        }
+        asignacionRepository.saveAll(asignaciones);
+        return asignaciones.size();
     }
 
     private AsignacionResponse toResponse(Asignacion a) {

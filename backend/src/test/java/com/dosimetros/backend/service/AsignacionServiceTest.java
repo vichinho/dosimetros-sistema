@@ -3,6 +3,7 @@ package com.dosimetros.backend.service;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
+import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
 import com.dosimetros.backend.entity.Cliente;
 import com.dosimetros.backend.entity.Dosimetro;
 import com.dosimetros.backend.entity.Ejecutivo;
@@ -162,5 +163,47 @@ class AsignacionServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> service.crear(r));
         verify(asignacionRepository, never()).save(any());
+    }
+
+    private com.dosimetros.backend.entity.Asignacion asignacion(int id, int tipoDosimetroId) {
+        com.dosimetros.backend.entity.Asignacion a = new com.dosimetros.backend.entity.Asignacion();
+        a.setId(id);
+        a.setDosimetro(dosimetro(id, "asignado", tipoDosimetroId));
+        a.setLinkTrello("http://viejo");
+        return a;
+    }
+
+    @Test
+    void correccionMasivaCambiaElLinkEnTodas() {
+        var a1 = asignacion(1, 2);
+        var a2 = asignacion(2, 2);
+        when(asignacionRepository.findAllById(List.of(1, 2))).thenReturn(List.of(a1, a2));
+        when(asignacionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var req = new CorreccionMasivaRequest();
+        req.setAsignacionIds(List.of(1, 2));
+        req.setCampo("linkTrello");
+        req.setValor("http://nuevo");
+
+        int n = service.correccionMasiva(req);
+
+        assertEquals(2, n);
+        assertEquals("http://nuevo", a1.getLinkTrello());
+        assertEquals("http://nuevo", a2.getLinkTrello());
+    }
+
+    @Test
+    void correccionMasivaDePortaFallaSiEsIncompatible() {
+        var a1 = asignacion(1, 2); // dosímetro tipo 2
+        when(asignacionRepository.findAllById(List.of(1))).thenReturn(List.of(a1));
+        when(tipoPortaRepository.findById(9)).thenReturn(Optional.of(tipoPorta(9, 3))); // porta tipo 3
+
+        var req = new CorreccionMasivaRequest();
+        req.setAsignacionIds(List.of(1));
+        req.setCampo("tipoPortaId");
+        req.setValor("9");
+
+        assertThrows(IllegalArgumentException.class, () -> service.correccionMasiva(req));
+        verify(asignacionRepository, never()).saveAll(any());
     }
 }
