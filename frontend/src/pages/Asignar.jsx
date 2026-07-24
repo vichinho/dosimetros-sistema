@@ -247,7 +247,7 @@ export default function Asignar() {
         linkTrello: datos.linkTrello.trim(),
       })
       setResumenIndividual(data)
-      toast.success(`Dosímetro #${data.numeroDosimetro} asignado`)
+      toast.success(`Dosímetro ${data.numeroDosimetro} asignado`)
       // limpiar la búsqueda para asignar el siguiente
       setNumero('')
       setCandidatos(null)
@@ -421,7 +421,7 @@ export default function Asignar() {
                       checked={dosimetroSel?.id === d.id}
                       onChange={() => setDosimetroSel(d)}
                     />
-                    <span className="font-medium text-ink">#{d.numero}</span>
+                    <span className="font-medium text-ink">{d.numero}</span>
                     <span className="text-slate-500">{d.tipoDosimetroNombre}</span>
                     <span className="text-slate-500">Porta: {d.tipoPortaNombre || '—'}</span>
                     <span className="text-slate-500">Tarea: {d.numeroTarea || '—'}</span>
@@ -527,7 +527,7 @@ function ResumenAsignaciones({ asignaciones }) {
           <tbody>
             {asignaciones.map((a) => (
               <tr key={a.id} className="border-b border-slate-100">
-                <td className="py-2 font-medium text-ink">#{a.numeroDosimetro}</td>
+                <td className="py-2 font-medium text-ink">{a.numeroDosimetro}</td>
                 <td className="py-2 text-slate-600">{a.tipoPortaNombre}</td>
                 <td className="py-2 text-slate-600">{a.numeroTarea || '—'}</td>
                 <td className="py-2 text-slate-600">

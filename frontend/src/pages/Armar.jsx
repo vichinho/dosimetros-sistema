@@ -429,7 +429,7 @@ export default function Armar() {
                     title={
                       armado
                         ? `Slot ${s.slotBandeja} · ${s.tipoPortaNombre} (armado)`
-                        : `Slot ${s.slotBandeja} · #${s.numero} (pendiente)`
+                        : `Slot ${s.slotBandeja} · dosímetro ${s.numero} (pendiente)`
                     }
                     className={`aspect-square rounded border text-xs font-medium flex items-center justify-center ${cls}`}
                   >

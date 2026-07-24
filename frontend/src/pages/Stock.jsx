@@ -7,6 +7,7 @@ import {
   getStockPortas,
   exportarStockExcel,
   actualizarStockExcel,
+  descargarPlantillaDosimetros,
   marcarDanado,
   marcarBueno,
   liberarDosimetro,
@@ -126,6 +127,20 @@ export default function Stock() {
 
   const recargarDetalle = () => getStockPortas().then(setDetallePortas).catch(() => {})
 
+  const descargarPlantilla = async () => {
+    try {
+      const blob = await descargarPlantillaDosimetros()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'plantilla_carga_dosimetros.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('No se pudo descargar la plantilla')
+    }
+  }
+
   // Abre el detalle de dosímetros de una tarea (opcionalmente acotado a una porta).
   const abrirDrill = (fila, col) => {
     setDrill({ numeroTarea: fila.numeroTarea, portaNombre: col?.nombre || null })
@@ -225,6 +240,11 @@ export default function Stock() {
             existe se crea, si cambió se actualiza y si es idéntico se deja igual. Los
             dosímetros asignados o dados de baja no se modifican.
           </p>
+          <div>
+            <Button type="button" variant="secondary" onClick={descargarPlantilla}>
+              Descargar plantilla
+            </Button>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="file"

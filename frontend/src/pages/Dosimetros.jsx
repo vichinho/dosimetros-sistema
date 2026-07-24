@@ -150,7 +150,7 @@ function Edicion({ tiposDosimetro, portas, toast }) {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs text-ink/50">Dosímetro · id interno {d.id}</p>
-              <h2 className="text-2xl font-bold text-ink leading-tight">#{d.numero}</h2>
+              <h2 className="text-2xl font-bold text-ink leading-tight">{d.numero}</h2>
               <div className="flex items-center gap-2 mt-1">
                 <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
                 {d.observacion && <Badge color="amber">{d.observacion}</Badge>}
@@ -260,7 +260,7 @@ function ModalEditar({ dosimetro, tiposDosimetro, portas, onClose, onGuardado, t
   }
 
   return (
-    <Modal title={`Editar dosímetro #${dosimetro.numero}`} onClose={onClose}>
+    <Modal title={`Editar dosímetro ${dosimetro.numero}`} onClose={onClose}>
       <div className="space-y-4">
         <p className="text-xs text-ink/50">La tarea, bandeja y slot no se editan aquí (se gestionan en Armar/Asignar).</p>
         <Input label="Número" type="number" value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} />
@@ -445,7 +445,7 @@ function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
                     {resultados.map((a) => (
                       <tr key={a.id} className={`border-b border-slate-100 ${seleccion.has(a.id) ? 'bg-steel/5' : ''}`}>
                         <td className="py-2"><input type="checkbox" checked={seleccion.has(a.id)} onChange={() => toggle(a.id)} /></td>
-                        <td className="py-2 font-medium text-ink">#{a.numeroDosimetro}</td>
+                        <td className="py-2 font-medium text-ink">{a.numeroDosimetro}</td>
                         <td className="py-2 text-slate-600">{a.clienteNombre}</td>
                         <td className="py-2 text-slate-600">{a.ejecutivoNombre}</td>
                         <td className="py-2 text-slate-600">{a.empresaNombre}</td>
