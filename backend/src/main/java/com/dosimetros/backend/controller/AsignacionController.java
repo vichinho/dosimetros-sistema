@@ -10,6 +10,8 @@ import com.dosimetros.backend.dto.asignacion.MarcarEnvioRequest;
 import com.dosimetros.backend.service.AsignacionService;
 import com.dosimetros.backend.service.ImportacionAsignacionService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -64,11 +66,35 @@ public class AsignacionController {
     }
 
     // #12: carga de asignaciones por archivo con upsert (clave = número).
+    // validar=true hace una validación en seco (no persiste, solo previsualiza).
     @PostMapping("/importacion")
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<ImportacionAsignacionesResponse> importarAsignaciones(
-            @RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(importacionService.importarExcel(file));
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false, defaultValue = "false") boolean validar) {
+        return ResponseEntity.ok(importacionService.importarExcel(file, validar));
+    }
+
+    // Plantilla .xlsx para la carga de asignaciones por archivo.
+    @GetMapping("/importacion/plantilla")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<byte[]> plantillaAsignaciones() {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"plantilla_asignaciones.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(importacionService.plantillaExcel());
+    }
+
+    // Exporta a Excel un conjunto de asignaciones por sus ids (resumen de asignación).
+    @PostMapping("/exportar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<byte[]> exportarPorIds(@RequestBody List<Integer> ids) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"asignaciones.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(service.exportarPorIds(ids));
     }
 
     // #14 (Correcciones): buscar asignaciones con filtros para corregir en lote.

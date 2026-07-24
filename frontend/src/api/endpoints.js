@@ -118,11 +118,17 @@ export const correccionMasivaAsignaciones = (data) =>
   client.patch('/asignaciones/correccion-masiva', data).then((r) => r.data)
 export const getDisponiblesPorNumero = (numero) =>
   client.get('/dosimetros/disponible-por-numero', { params: { numero } }).then((r) => r.data)
-export const importarAsignacionesExcel = (file) => {
+export const importarAsignacionesExcel = (file, validar = false) => {
   const formData = new FormData()
   formData.append('file', file)
-  return client.post('/asignaciones/importacion', formData).then((r) => r.data)
+  return client
+    .post('/asignaciones/importacion', formData, { params: { validar } })
+    .then((r) => r.data)
 }
+export const descargarPlantillaAsignaciones = () =>
+  client.get('/asignaciones/importacion/plantilla', { responseType: 'blob' }).then((r) => r.data)
+export const exportarAsignacionesPorIds = (ids) =>
+  client.post('/asignaciones/exportar', ids, { responseType: 'blob' }).then((r) => r.data)
 
 // --- Vistas del ejecutivo ---
 export const getMisClientes = () => client.get('/ejecutivo/mis-clientes').then((r) => r.data)

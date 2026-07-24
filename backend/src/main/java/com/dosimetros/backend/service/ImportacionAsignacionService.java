@@ -85,6 +85,15 @@ public class ImportacionAsignacionService {
 
     @Transactional
     public ImportacionAsignacionesResponse importarExcel(MultipartFile file) {
+        return importarExcel(file, false);
+    }
+
+    /**
+     * dryRun=true valida el archivo sin persistir nada (previsualización): informa
+     * qué se crearía, actualizaría o dejaría igual, y los errores por fila.
+     */
+    @Transactional
+    public ImportacionAsignacionesResponse importarExcel(MultipartFile file, boolean dryRun) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Debe enviar un archivo Excel");
         }
@@ -128,19 +137,21 @@ public class ImportacionAsignacionService {
                             .findByDosimetroIdOrderByFechaAsignacionDesc(f.dosimetro().getId());
 
                     if (previas.isEmpty()) {
-                        crearAsignacion(f);
+                        if (!dryRun) crearAsignacion(f);
                         creados++;
                     } else {
                         Asignacion actual = previas.get(0); // la más reciente
                         if (mismaAsignacion(actual, f)) {
                             sinCambios++;
                         } else {
-                            aplicar(actual, f);
-                            asignacionRepository.save(actual);
-                            // por si el dosímetro no estaba marcado como asignado
-                            if (!"asignado".equalsIgnoreCase(f.dosimetro().getEstado())) {
-                                f.dosimetro().setEstado("asignado");
-                                dosimetroRepository.save(f.dosimetro());
+                            if (!dryRun) {
+                                aplicar(actual, f);
+                                asignacionRepository.save(actual);
+                                // por si el dosímetro no estaba marcado como asignado
+                                if (!"asignado".equalsIgnoreCase(f.dosimetro().getEstado())) {
+                                    f.dosimetro().setEstado("asignado");
+                                    dosimetroRepository.save(f.dosimetro());
+                                }
                             }
                             actualizados++;
                         }
@@ -162,6 +173,35 @@ public class ImportacionAsignacionService {
         }
 
         return response;
+    }
+
+    // Plantilla .xlsx con encabezados y una fila de ejemplo (columnas por nombre).
+    public byte[] plantillaExcel() {
+        String[] cab = {"numero_dosimetro", "cliente", "ejecutivo", "empresa",
+                "tipo_porta", "trimestre", "link_trello"};
+        String[] ej = {"12345", "ACME Salud", "Juan Pérez", "Photomat",
+                "Porta gringo", "2T2026", "https://trello.com/c/ejemplo"};
+        try (Workbook wb = new XSSFWorkbook();
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Asignaciones");
+            CellStyle negrita = wb.createCellStyle();
+            Font font = wb.createFont();
+            font.setBold(true);
+            negrita.setFont(font);
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < cab.length; i++) {
+                Cell c = header.createCell(i);
+                c.setCellValue(cab[i]);
+                c.setCellStyle(negrita);
+            }
+            Row fila = sheet.createRow(1);
+            for (int i = 0; i < ej.length; i++) fila.createCell(i).setCellValue(ej[i]);
+            for (int i = 0; i < cab.length; i++) sheet.autoSizeColumn(i);
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Error al generar la plantilla", e);
+        }
     }
 
     private Fila parseFila(Row row, DataFormatter fmt) {

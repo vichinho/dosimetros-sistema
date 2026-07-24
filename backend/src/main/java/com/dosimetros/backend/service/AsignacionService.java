@@ -262,6 +262,13 @@ public class AsignacionService {
         );
     }
 
+    // Exporta a Excel un conjunto de asignaciones por sus ids (resumen de asignación).
+    public byte[] exportarPorIds(List<Integer> ids) {
+        List<AsignacionResponse> asignaciones = asignacionRepository.findAllById(ids)
+                .stream().map(this::toResponse).toList();
+        return exportarAsignacionesExcel(asignaciones);
+    }
+
     /**
      * #15: exporta una lista de asignaciones a Excel (.xlsx). Incluye la tarea.
      */
