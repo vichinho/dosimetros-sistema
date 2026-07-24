@@ -5,6 +5,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
 import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
+import com.dosimetros.backend.dto.asignacion.EditarAsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.ImportacionAsignacionesResponse;
 import com.dosimetros.backend.dto.asignacion.MarcarEnvioRequest;
 import com.dosimetros.backend.service.AsignacionService;
@@ -109,6 +110,15 @@ public class AsignacionController {
             @RequestParam(required = false) String link) {
         return ResponseEntity.ok(
                 service.buscarAsignaciones(clienteId, ejecutivoId, empresaId, trimestre, tipoPortaId, link));
+    }
+
+    // #14: editar una asignación existente del historial (incluido el cliente).
+    @PatchMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<AsignacionResponse> editarAsignacion(
+            @PathVariable Integer id,
+            @Valid @RequestBody EditarAsignacionRequest request) {
+        return ResponseEntity.ok(service.editarAsignacion(id, request));
     }
 
     // #14 (Correcciones): corregir un mismo campo en varias asignaciones a la vez.

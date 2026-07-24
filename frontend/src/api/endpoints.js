@@ -116,6 +116,8 @@ export const getMisPendientesEnvio = (params) =>
   client.get('/ejecutivo/pendientes-envio', { params }).then((r) => r.data)
 export const correccionMasivaAsignaciones = (data) =>
   client.patch('/asignaciones/correccion-masiva', data).then((r) => r.data)
+export const editarAsignacion = (id, data) =>
+  client.patch(`/asignaciones/${id}`, data).then((r) => r.data)
 export const getDisponiblesPorNumero = (numero) =>
   client.get('/dosimetros/disponible-por-numero', { params: { numero } }).then((r) => r.data)
 export const importarAsignacionesExcel = (file, validar = false) => {

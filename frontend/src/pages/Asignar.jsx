@@ -15,6 +15,7 @@ import {
 import { Card, Button, Input, Alert, Badge, EmptyState } from '../components/ui'
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
+import { useSearchParams } from 'react-router-dom'
 
 const TRIMESTRE_REGEX = /^[1-4]T\d{4}$/
 const hoyISO = () => new Date().toISOString().slice(0, 10)
@@ -105,6 +106,24 @@ export default function Asignar() {
     getEjecutivos().then(setEjecutivos).catch(() => {})
     getEmpresas().then(setEmpresas).catch(() => {})
     getTiposPorta().then(setPortas).catch(() => {})
+  }, [])
+
+  // Precarga desde otra pantalla: /asignar?vista=individual&numero=123
+  const [searchParams] = useSearchParams()
+  useEffect(() => {
+    const v = searchParams.get('vista')
+    const n = searchParams.get('numero')
+    if (v) setVista(v)
+    if (n) {
+      setNumero(n)
+      getDisponiblesPorNumero(Number(n))
+        .then((enc) => {
+          setCandidatos(enc)
+          if (enc.length === 1) setDosimetroSel(enc[0])
+        })
+        .catch(() => {})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Masiva: tareas con disponibles compatibles con el porta elegido.
