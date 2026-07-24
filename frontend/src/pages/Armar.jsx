@@ -413,12 +413,12 @@ export default function Armar() {
               </span>
             </div>
 
-            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-1.5">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5">
               {bandejaAbierta.slots.map((s) => {
                 const armado = !esPendiente(s)
                 const sel = seleccion.has(s.id)
-                let cls = 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
-                if (armado) cls = 'bg-mist/50 border-mist text-ink/40 cursor-not-allowed'
+                let cls = 'bg-emerald-50 border-emerald-300 text-emerald-900 hover:bg-emerald-100'
+                if (armado) cls = 'bg-mist/50 border-mist text-ink/45 cursor-not-allowed'
                 else if (sel) cls = 'bg-steel border-steel text-white'
                 return (
                   <button
@@ -428,12 +428,13 @@ export default function Armar() {
                     onClick={() => toggleSlot(s)}
                     title={
                       armado
-                        ? `Slot ${s.slotBandeja} · ${s.tipoPortaNombre} (armado)`
+                        ? `Slot ${s.slotBandeja} · dosímetro ${s.numero} · ${s.tipoPortaNombre} (armado)`
                         : `Slot ${s.slotBandeja} · dosímetro ${s.numero} (pendiente)`
                     }
-                    className={`aspect-square rounded border text-xs font-medium flex items-center justify-center ${cls}`}
+                    className={`rounded border px-1.5 py-1.5 flex flex-col items-center justify-center leading-tight ${cls}`}
                   >
-                    {s.slotBandeja}
+                    <span className={`text-[10px] ${sel ? 'text-white/80' : 'text-ink/45'}`}>Slot {s.slotBandeja}</span>
+                    <span className="text-xs font-semibold">{s.numero}</span>
                   </button>
                 )
               })}
