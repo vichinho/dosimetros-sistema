@@ -4,6 +4,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.ConteoClienteTrimestreResponse;
 import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.EditarAsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.ImportacionAsignacionesResponse;
@@ -137,6 +138,14 @@ public class AsignacionController {
             @RequestParam(required = false) String trimestre,
             @RequestParam(required = false, defaultValue = "false") boolean enviado) {
         return ResponseEntity.ok(service.porEstadoEnvio(ejecutivoId, trimestre, enviado));
+    }
+
+    // #18: comparación por trimestres — conteo de asignaciones por cliente y trimestre.
+    @GetMapping("/resumen-cliente-trimestre")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<ConteoClienteTrimestreResponse>> resumenClienteTrimestre(
+            @RequestParam(required = false) Integer ejecutivoId) {
+        return ResponseEntity.ok(service.conteoPorClienteTrimestre(ejecutivoId));
     }
 
     // #18: marcar asignaciones como enviadas (o revertir).

@@ -114,6 +114,10 @@ export const marcarEnvioAsignaciones = (data) =>
   client.patch('/asignaciones/envio', data).then((r) => r.data)
 export const getMisPendientesEnvio = (params) =>
   client.get('/ejecutivo/pendientes-envio', { params }).then((r) => r.data)
+export const getResumenClienteTrimestre = (params) =>
+  client.get('/asignaciones/resumen-cliente-trimestre', { params }).then((r) => r.data)
+export const getMisResumenClienteTrimestre = () =>
+  client.get('/ejecutivo/resumen-cliente-trimestre').then((r) => r.data)
 export const correccionMasivaAsignaciones = (data) =>
   client.patch('/asignaciones/correccion-masiva', data).then((r) => r.data)
 export const editarAsignacion = (id, data) =>

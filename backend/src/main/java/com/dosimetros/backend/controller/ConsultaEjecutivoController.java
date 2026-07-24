@@ -92,6 +92,13 @@ public class ConsultaEjecutivoController {
         return ResponseEntity.ok(asignacionService.porEstadoEnvio(ejecutivoId, trimestre, enviado));
     }
 
+    // #18: comparación por trimestres del ejecutivo (solo sus clientes).
+    @GetMapping("/resumen-cliente-trimestre")
+    public ResponseEntity<List<com.dosimetros.backend.dto.asignacion.ConteoClienteTrimestreResponse>> misResumenClienteTrimestre() {
+        Integer ejecutivoId = currentUserService.requireEjecutivoId();
+        return ResponseEntity.ok(asignacionService.conteoPorClienteTrimestre(ejecutivoId));
+    }
+
     @GetMapping("/mis-filtros")
     public ResponseEntity<MisFiltrosResponse> misFiltros() {
         Integer ejecutivoId = currentUserService.requireEjecutivoId();

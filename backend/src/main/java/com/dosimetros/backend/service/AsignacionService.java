@@ -4,6 +4,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.ConteoClienteTrimestreResponse;
 import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.EditarAsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.LoteAsignacionResponse;
@@ -305,6 +306,14 @@ public class AsignacionService {
 
     private String nvl(String v) {
         return v == null ? "" : v;
+    }
+
+    // #18: conteo de asignaciones por cliente y trimestre (comparación por trimestres).
+    public List<ConteoClienteTrimestreResponse> conteoPorClienteTrimestre(Integer ejecutivoId) {
+        return asignacionRepository.conteoPorClienteTrimestre(ejecutivoId).stream()
+                .map(o -> new ConteoClienteTrimestreResponse(
+                        (Integer) o[0], (String) o[1], ((Number) o[2]).longValue()))
+                .toList();
     }
 
     // #18: asignaciones por estado de envío (enviado=false => pendientes).
