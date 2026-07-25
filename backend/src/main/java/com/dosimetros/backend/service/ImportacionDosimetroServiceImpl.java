@@ -12,6 +12,7 @@ import com.dosimetros.backend.repository.TipoDosimetroRepository;
 import com.dosimetros.backend.repository.TipoPortaRepository;
 import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -241,6 +242,15 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
         // Fila de ejemplo ficticia para guiar el llenado.
         String[] ejemplo = {"12345", "TLD", "Porta gringo", "1765", "3", "12"};
 
+        // Opciones reales del sistema para los desplegables.
+        List<String> tiposDosimetro = tipoDosimetroRepository.findAll().stream()
+                .map(TipoDosimetro::getNombre).sorted().toList();
+        List<String> tiposPorta = tipoPortaRepository.findAll().stream()
+                .map(TipoPorta::getNombre).distinct().sorted().toList();
+
+        // Última fila (0-indexada) a la que se aplica el desplegable.
+        final int ULTIMA_FILA = 1000;
+
         try (Workbook wb = new XSSFWorkbook();
              java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("Carga");
@@ -263,11 +273,48 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
             for (int i = 0; i < cabeceras.length; i++) sheet.autoSizeColumn(i);
 
+            // Hoja oculta con las listas de opciones (evita el límite de 255
+            // caracteres de las listas explícitas de validación).
+            Sheet opciones = wb.createSheet("opciones");
+            for (int i = 0; i < tiposDosimetro.size(); i++) {
+                opciones.createRow(i).createCell(0).setCellValue(tiposDosimetro.get(i));
+            }
+            for (int i = 0; i < tiposPorta.size(); i++) {
+                Row r = opciones.getRow(i);
+                if (r == null) r = opciones.createRow(i);
+                r.createCell(1).setCellValue(tiposPorta.get(i));
+            }
+            wb.setSheetHidden(wb.getSheetIndex("opciones"), true);
+
+            // Desplegables (columna B = tipo_dosimetro, columna C = tipo_porta).
+            DataValidationHelper helper = sheet.getDataValidationHelper();
+            if (!tiposDosimetro.isEmpty()) {
+                agregarDesplegable(sheet, helper, 1, ULTIMA_FILA, 1,
+                        "opciones!$A$1:$A$" + tiposDosimetro.size());
+            }
+            if (!tiposPorta.isEmpty()) {
+                agregarDesplegable(sheet, helper, 1, ULTIMA_FILA, 2,
+                        "opciones!$B$1:$B$" + tiposPorta.size());
+            }
+
             wb.write(out);
             return out.toByteArray();
         } catch (IOException e) {
             throw new RuntimeException("Error al generar la plantilla", e);
         }
+    }
+
+    // Aplica una lista desplegable a un rango de una columna, referenciando una
+    // hoja de opciones (permite listas largas sin el límite de 255 caracteres).
+    private void agregarDesplegable(Sheet sheet, DataValidationHelper helper,
+                                    int primeraFila, int ultimaFila, int columna, String formula) {
+        CellRangeAddressList rango = new CellRangeAddressList(primeraFila, ultimaFila, columna, columna);
+        DataValidationConstraint constraint = helper.createFormulaListConstraint(formula);
+        DataValidation validacion = helper.createValidation(constraint, rango);
+        validacion.setSuppressDropDownArrow(true);
+        validacion.setShowErrorBox(true);
+        validacion.createErrorBox("Valor no válido", "Elige una opción de la lista.");
+        sheet.addValidationData(validacion);
     }
 
     // --- Helpers compartidos ---
