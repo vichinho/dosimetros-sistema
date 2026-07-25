@@ -7,7 +7,7 @@ import {
   getResumenClienteTrimestre,
   getMisResumenClienteTrimestre,
 } from '../api/endpoints'
-import { Card, Select, Input, Badge, Loading, EmptyState, Pagination } from '../components/ui'
+import { Card, Select, Input, Button, Badge, Loading, EmptyState, Pagination } from '../components/ui'
 import { useToast } from '../components/Toast'
 
 const POR_PAGINA = 10
@@ -106,6 +106,41 @@ export default function PendienteAsignacion() {
 
   const colLabel = columnas.length ? columnas[0] : null
 
+  // Exporta la tabla tal como se ve, respetando los filtros seleccionados
+  // (búsqueda, ejecutivo, trimestres a comparar y "solo pendientes"). Se
+  // exportan TODAS las filas filtradas, no solo la página visible.
+  const exportarClientes = () => {
+    if (columnas.length === 0 || filas.length === 0) {
+      toast.error('No hay datos para exportar con los filtros actuales')
+      return
+    }
+    const sep = ';' // separador de lista habitual en Excel en español
+    const esc = (v) => {
+      const s = String(v ?? '')
+      return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+    }
+    const encabezados = ['Cliente', ...columnas]
+    const lineas = filas.map((c) => {
+      const conteo = porCliente.get(c.id) || {}
+      const celdas = [c.razonSocial, ...columnas.map((t) => {
+        const n = conteo[t] || 0
+        return n > 0 ? n : 'Pendiente'
+      })]
+      return celdas.map(esc).join(sep)
+    })
+    const csv = '﻿' + [encabezados.map(esc).join(sep), ...lineas].join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const ejec = ejecutivos.find((e) => String(e.id) === String(ejecutivoId))
+    const sufijo = ejec ? '_' + ejec.nombre.replace(/[^a-zA-Z0-9]+/g, '-') : ''
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `pendiente_asignacion${sufijo}_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exportados ${filas.length} clientes`)
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -158,7 +193,18 @@ export default function PendienteAsignacion() {
         </div>
       </Card>
 
-      <Card title={`Clientes (${filas.length})`}>
+      <Card
+        title={`Clientes (${filas.length})`}
+        action={
+          <Button
+            variant="secondary"
+            onClick={exportarClientes}
+            disabled={loading || columnas.length === 0 || filas.length === 0}
+          >
+            Exportar clientes
+          </Button>
+        }
+      >
         {loading ? (
           <Loading />
         ) : columnas.length === 0 ? (
