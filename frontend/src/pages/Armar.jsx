@@ -107,10 +107,12 @@ export default function Armar() {
 
   // Tipo de dosímetro de la tarea → portas compatibles.
   const tipoDosimetroId = dosimetros[0]?.tipoDosimetroId
-  const portasCompat = (tipoDosimetroId
+  const portasDelTipo = tipoDosimetroId
     ? portas.filter((p) => String(p.tipoDosimetroId) === String(tipoDosimetroId))
     : portas
-  ).filter((p) => !(p.nombre || '').toLowerCase().startsWith('sin armar'))
+  const portasCompat = portasDelTipo.filter((p) => !(p.nombre || '').toLowerCase().startsWith('sin armar'))
+  // Porta "Sin armar" compatible con la tarea (permite des-armar un rango).
+  const portaSinArmar = portasDelTipo.find((p) => (p.nombre || '').toLowerCase().startsWith('sin armar'))
 
   const totalPendientes = bandejas.reduce((a, b) => a + b.pendientes, 0)
   const totalArmados = bandejas.reduce((a, b) => a + b.armados, 0)
@@ -152,7 +154,8 @@ export default function Armar() {
         slotHasta: null,
         tipoPortaId: Number(rango.tipoPortaId),
       })
-      toast.success(`${data.dosimetrosActualizados} dosímetros armados`)
+      const esSinArmar = portaSinArmar && String(rango.tipoPortaId) === String(portaSinArmar.id)
+      toast.success(`${data.dosimetrosActualizados} dosímetros ${esSinArmar ? 'des-armados' : 'armados'}`)
       cargarMapa(tareaId)
       cargarResumen()
     } catch (err) {
@@ -335,6 +338,9 @@ export default function Armar() {
                   {portasCompat.map((p) => (
                     <option key={p.id} value={p.id}>{p.nombre}</option>
                   ))}
+                  {portaSinArmar && (
+                    <option value={portaSinArmar.id}>Sin armar (quitar porta)</option>
+                  )}
                 </Select>
                 <Button type="submit" disabled={armandoRango}>
                   {armandoRango ? 'Armando…' : 'Armar rango'}
