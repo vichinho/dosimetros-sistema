@@ -15,9 +15,19 @@ public class ActualizacionStockResponse {
     private int actualizados;
     private int sinCambios;
     private int fallidas;
+    // Si el archivo tenía errores no se guarda nada (todo o nada): aplicado = false.
+    private boolean aplicado = true;
     private List<String> errores = new ArrayList<>();
 
     public ActualizacionStockResponse() {
+    }
+
+    public boolean isAplicado() {
+        return aplicado;
+    }
+
+    public void setAplicado(boolean aplicado) {
+        this.aplicado = aplicado;
     }
 
     public int getTotalFilas() {

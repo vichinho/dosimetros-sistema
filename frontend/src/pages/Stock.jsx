@@ -156,11 +156,16 @@ export default function Stock() {
     try {
       const data = await actualizarStockExcel(archivo)
       setResultado(data)
-      toast.success(
-        `Actualización: ${data.creados} creados, ${data.actualizados} actualizados, ${data.sinCambios} sin cambios`
-      )
-      cargar()
-      recargarDetalle()
+      if (data.aplicado === false) {
+        // El archivo tenía errores: no se guardó nada. Se muestra el detalle abajo.
+        toast.error('El archivo tiene errores. No se guardó ningún cambio; corrígelos y vuelve a subirlo.')
+      } else {
+        toast.success(
+          `Actualización: ${data.creados} creados, ${data.actualizados} actualizados, ${data.sinCambios} sin cambios`
+        )
+        cargar()
+        recargarDetalle()
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'No se pudo actualizar el stock'
       setErrorArchivo(msg)
@@ -303,6 +308,14 @@ export default function Stock() {
         {errorArchivo && <div className="mt-3"><Alert type="error">{errorArchivo}</Alert></div>}
         {resultado && (
           <div className="mt-4">
+            {resultado.aplicado === false && (
+              <div className="mb-3">
+                <Alert type="error">
+                  El archivo contiene datos erróneos, por lo que <b>no se guardó ningún cambio</b>.
+                  Corrige los errores del listado y vuelve a subir el archivo.
+                </Alert>
+              </div>
+            )}
             <div className="flex flex-wrap gap-4 text-sm mb-3">
               <span>Total filas: <b>{resultado.totalFilas}</b></span>
               <span className="text-emerald-600">Creados: <b>{resultado.creados}</b></span>

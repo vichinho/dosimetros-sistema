@@ -146,6 +146,23 @@ class ActualizacionStockServiceTest {
     }
 
     @Test
+    void archivoConErroresNoAplicaNada() {
+        // Una fila válida (nueva) y una inválida (tipo de dosímetro inexistente).
+        // Al haber error, no se guarda nada y el resumen queda en cero.
+        ActualizacionStockResponse resp = service.actualizarStockExcel(excel(new String[][]{
+                {"900", "TLD", "Gringo", "1765", "5", "5"}, // válida (sería creada)
+                {"901", "NO_EXISTE", "Gringo", "1765", "6", "6"}, // tipo inexistente -> error
+        }));
+
+        assertEquals(false, resp.isAplicado());
+        assertEquals(0, resp.getCreados());
+        assertEquals(0, resp.getActualizados());
+        assertEquals(0, resp.getSinCambios());
+        assertEquals(1, resp.getFallidas());
+        org.junit.jupiter.api.Assertions.assertFalse(resp.getErrores().isEmpty());
+    }
+
+    @Test
     void upsertNoActualizaSiElNumeroEstaDuplicadoEnElSistema() {
         seedDosimetro(700, gringo, 1, 1, "disponible");
         seedDosimetro(700, viejo, 2, 2, "disponible"); // mismo número, duplicado real

@@ -81,6 +81,9 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
         ImportacionDosimetrosResponse response = new ImportacionDosimetrosResponse();
         List<String> errores = new ArrayList<>();
+        // Guarda los saves hasta validar todo el archivo: solo se ejecutan si no
+        // hubo ningún error (todo o nada).
+        List<Runnable> acciones = new ArrayList<>();
         int exitosas = 0;
         int fallidas = 0;
         int omitidas = 0;
@@ -120,13 +123,24 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                         continue;
                     }
 
-                    dosimetroRepository.save(nuevoDosimetro(f));
+                    Dosimetro nuevo = nuevoDosimetro(f);
+                    acciones.add(() -> dosimetroRepository.save(nuevo));
                     exitosas++;
 
                 } catch (Exception e) {
                     fallidas++;
                     errores.add("Fila " + fila + ": " + e.getMessage());
                 }
+            }
+
+            // Todo o nada: solo se persiste si el archivo no tenía ningún error;
+            // en caso contrario no se guarda nada y se conserva el detalle de
+            // errores para mostrarlo al usuario.
+            if (errores.isEmpty()) {
+                acciones.forEach(Runnable::run);
+            } else {
+                response.setAplicado(false);
+                exitosas = 0;
             }
 
             response.setTotalFilas(totalFilas);
@@ -149,6 +163,9 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
         ActualizacionStockResponse response = new ActualizacionStockResponse();
         List<String> errores = new ArrayList<>();
+        // Guarda los cambios hasta validar todo el archivo: solo se ejecutan si
+        // no hubo ningún error (todo o nada).
+        List<Runnable> acciones = new ArrayList<>();
         int creados = 0;
         int actualizados = 0;
         int sinCambios = 0;
@@ -185,7 +202,8 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
                     if (existentes.isEmpty()) {
                         // No existe → se crea (upsert: insert).
-                        dosimetroRepository.save(nuevoDosimetro(f));
+                        Dosimetro nuevo = nuevoDosimetro(f);
+                        acciones.add(() -> dosimetroRepository.save(nuevo));
                         creados++;
                     } else if (existentes.size() > 1) {
                         // Número duplicado en el sistema: no se puede actualizar sin ambigüedad.
@@ -205,12 +223,16 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                             errores.add("Fila " + fila + ": número " + f.numero() + " está " + estado
                                     + "; no se actualiza su armado por archivo");
                         } else {
-                            d.setTipoDosimetro(f.tipoDosimetro());
-                            d.setTipoPorta(f.tipoPorta());
-                            d.setTarea(f.tarea());
-                            d.setNumeroBandeja(f.numeroBandeja());
-                            d.setSlotBandeja(f.slotBandeja());
-                            dosimetroRepository.save(d);
+                            // La mutación se difiere: solo se aplica si el archivo
+                            // completo es válido.
+                            acciones.add(() -> {
+                                d.setTipoDosimetro(f.tipoDosimetro());
+                                d.setTipoPorta(f.tipoPorta());
+                                d.setTarea(f.tarea());
+                                d.setNumeroBandeja(f.numeroBandeja());
+                                d.setSlotBandeja(f.slotBandeja());
+                                dosimetroRepository.save(d);
+                            });
                             actualizados++;
                         }
                     }
@@ -219,6 +241,18 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                     fallidas++;
                     errores.add("Fila " + fila + ": " + e.getMessage());
                 }
+            }
+
+            // Todo o nada: solo se persiste si el archivo no tenía ningún error;
+            // en caso contrario no se guarda nada y se conserva el detalle de
+            // errores para mostrarlo al usuario.
+            if (errores.isEmpty()) {
+                acciones.forEach(Runnable::run);
+            } else {
+                response.setAplicado(false);
+                creados = 0;
+                actualizados = 0;
+                sinCambios = 0;
             }
 
             response.setTotalFilas(totalFilas);
