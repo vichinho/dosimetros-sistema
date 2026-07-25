@@ -213,15 +213,17 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                     } else {
                         Dosimetro d = existentes.get(0);
                         String estado = d.getEstado();
-                        boolean bloqueado = "asignado".equalsIgnoreCase(estado)
-                                || "baja".equalsIgnoreCase(estado);
+                        boolean dadoDeBaja = "baja".equalsIgnoreCase(estado);
+                        boolean estabaAsignado = "asignado".equalsIgnoreCase(estado);
 
                         if (mismoArmado(d, f)) {
                             sinCambios++;
-                        } else if (bloqueado) {
+                        } else if (dadoDeBaja) {
+                            // Un dosímetro dado de baja no se reactiva por archivo;
+                            // requiere una acción explícita.
                             fallidas++;
-                            errores.add("Fila " + fila + ": número " + f.numero() + " está " + estado
-                                    + "; no se actualiza su armado por archivo");
+                            errores.add("Fila " + fila + ": número " + f.numero()
+                                    + " está dado de baja; no se actualiza su armado por archivo");
                         } else {
                             // La mutación se difiere: solo se aplica si el archivo
                             // completo es válido.
@@ -231,6 +233,13 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                                 d.setTarea(f.tarea());
                                 d.setNumeroBandeja(f.numeroBandeja());
                                 d.setSlotBandeja(f.slotBandeja());
+                                // Si venía asignado, el dosímetro volvió a la oficina
+                                // y se rearma con la nueva tarea: queda disponible para
+                                // una nueva asignación. La asignación anterior se
+                                // conserva como historial.
+                                if (estabaAsignado) {
+                                    d.setEstado("disponible");
+                                }
                                 dosimetroRepository.save(d);
                             });
                             actualizados++;

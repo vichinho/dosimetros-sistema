@@ -131,18 +131,37 @@ class ActualizacionStockServiceTest {
     }
 
     @Test
-    void upsertNoTocaDosimetrosAsignados() {
+    void upsertRearmaDosimetroAsignadoYLoDejaDisponible() {
+        // El dosímetro volvió a la oficina: aunque figure "asignado" a un cliente
+        // anterior, se puede rearmar con una tarea nueva y queda disponible.
         seedDosimetro(500, gringo, 1, 1, "asignado");
 
         ActualizacionStockResponse resp = service.actualizarStockExcel(excel(new String[][]{
-                {"500", "TLD", "Viejo", "1765", "9", "9"}, // asignado -> bloqueado
+                {"500", "TLD", "Viejo", "1765", "9", "9"}, // se rearma
         }));
 
+        assertEquals(0, resp.getFallidas());
+        assertEquals(1, resp.getActualizados());
+        Dosimetro d500 = dosimetroRepository.findByNumeroOrderByIdAsc(500).get(0);
+        assertEquals(viejo.getId(), d500.getTipoPorta().getId());
+        assertEquals("disponible", d500.getEstado());
+    }
+
+    @Test
+    void upsertNoTocaDosimetrosDadosDeBaja() {
+        seedDosimetro(600, gringo, 1, 1, "baja");
+
+        ActualizacionStockResponse resp = service.actualizarStockExcel(excel(new String[][]{
+                {"600", "TLD", "Viejo", "1765", "9", "9"}, // dado de baja -> bloqueado
+        }));
+
+        assertEquals(false, resp.isAplicado());
         assertEquals(1, resp.getFallidas());
         assertEquals(0, resp.getActualizados());
-        // Se mantiene la porta original.
-        Dosimetro d500 = dosimetroRepository.findByNumeroOrderByIdAsc(500).get(0);
-        assertEquals(gringo.getId(), d500.getTipoPorta().getId());
+        // Se mantiene la porta y el estado originales.
+        Dosimetro d600 = dosimetroRepository.findByNumeroOrderByIdAsc(600).get(0);
+        assertEquals(gringo.getId(), d600.getTipoPorta().getId());
+        assertEquals("baja", d600.getEstado());
     }
 
     @Test
