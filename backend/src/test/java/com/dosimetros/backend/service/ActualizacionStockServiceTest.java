@@ -182,6 +182,30 @@ class ActualizacionStockServiceTest {
     }
 
     @Test
+    void upsertCargaCopiaYAvisaSiElNumeroYaEstaArmadoEnOtraTarea() {
+        // Existe el 800 disponible, armado en la tarea 1765.
+        seedDosimetro(800, gringo, 1, 2, "disponible");
+        // Tarea alternativa para simular un posible duplicado físico.
+        Tarea tarea8440 = new Tarea();
+        tarea8440.setNumeroTarea("8440");
+        tarea8440.setFechaCreacion(LocalDate.of(2025, 1, 1));
+        tareaRepository.save(tarea8440);
+
+        ActualizacionStockResponse resp = service.actualizarStockExcel(excel(new String[][]{
+                {"800", "TLD", "Gringo", "8440", "2", "1"}, // mismo número, otra tarea
+        }));
+
+        // No se sobrescribe: se carga una copia y se avisa (no bloquea).
+        assertEquals(true, resp.isAplicado());
+        assertEquals(0, resp.getActualizados());
+        assertEquals(1, resp.getDuplicados());
+        assertEquals(0, resp.getFallidas());
+        org.junit.jupiter.api.Assertions.assertFalse(resp.getAlertas().isEmpty());
+        // Ahora existen dos dosímetros con el número 800.
+        assertEquals(2, dosimetroRepository.findByNumeroOrderByIdAsc(800).size());
+    }
+
+    @Test
     void upsertNoActualizaSiElNumeroEstaDuplicadoEnElSistema() {
         seedDosimetro(700, gringo, 1, 1, "disponible");
         seedDosimetro(700, viejo, 2, 2, "disponible"); // mismo número, duplicado real

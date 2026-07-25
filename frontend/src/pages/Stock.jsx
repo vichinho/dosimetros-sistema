@@ -160,9 +160,13 @@ export default function Stock() {
         // El archivo tenía errores: no se guardó nada. Se muestra el detalle abajo.
         toast.error('El archivo tiene errores. No se guardó ningún cambio; corrígelos y vuelve a subirlo.')
       } else {
+        const extraDup = data.duplicados ? `, ${data.duplicados} duplicados` : ''
         toast.success(
-          `Actualización: ${data.creados} creados, ${data.actualizados} actualizados, ${data.sinCambios} sin cambios`
+          `Actualización: ${data.creados} creados, ${data.actualizados} actualizados, ${data.sinCambios} sin cambios${extraDup}`
         )
+        if (data.duplicados) {
+          toast.error(`${data.duplicados} posible(s) duplicado(s). Revísalos en el módulo Duplicados.`)
+        }
         cargar()
         recargarDetalle()
       }
@@ -321,8 +325,23 @@ export default function Stock() {
               <span className="text-emerald-600">Creados: <b>{resultado.creados}</b></span>
               <span className="text-steel">Actualizados: <b>{resultado.actualizados}</b></span>
               <span className="text-ink/60">Sin cambios: <b>{resultado.sinCambios}</b></span>
+              {resultado.duplicados > 0 && (
+                <span className="text-amber-600">Duplicados: <b>{resultado.duplicados}</b></span>
+              )}
               <span className="text-red-600">Con problemas: <b>{resultado.fallidas}</b></span>
             </div>
+            {resultado.alertas?.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 max-h-60 overflow-auto">
+                <p className="text-sm font-medium text-amber-800 mb-1">
+                  Posibles duplicados (se cargaron; resuélvelos en el módulo Duplicados):
+                </p>
+                <ul className="text-sm text-amber-700 space-y-1">
+                  {resultado.alertas.map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {resultado.errores?.length > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-60 overflow-auto">
                 <ul className="text-sm text-red-700 space-y-1">

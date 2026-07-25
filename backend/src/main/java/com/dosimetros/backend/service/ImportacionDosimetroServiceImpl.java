@@ -163,6 +163,7 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
         ActualizacionStockResponse response = new ActualizacionStockResponse();
         List<String> errores = new ArrayList<>();
+        List<String> alertas = new ArrayList<>();
         // Guarda los cambios hasta validar todo el archivo: solo se ejecutan si
         // no hubo ningún error (todo o nada).
         List<Runnable> acciones = new ArrayList<>();
@@ -170,6 +171,7 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
         int actualizados = 0;
         int sinCambios = 0;
         int fallidas = 0;
+        int duplicados = 0;
         Set<Integer> numerosEnArchivo = new HashSet<>();
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
@@ -216,6 +218,9 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                         boolean dadoDeBaja = "baja".equalsIgnoreCase(estado);
                         boolean estabaAsignado = "asignado".equalsIgnoreCase(estado);
 
+                        boolean armadoEnOtraTarea = d.getTarea() != null && f.tarea() != null
+                                && !Objects.equals(d.getTarea().getId(), f.tarea().getId());
+
                         if (mismoArmado(d, f)) {
                             sinCambios++;
                         } else if (dadoDeBaja) {
@@ -224,6 +229,20 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                             fallidas++;
                             errores.add("Fila " + fila + ": número " + f.numero()
                                     + " está dado de baja; no se actualiza su armado por archivo");
+                        } else if (!estabaAsignado && armadoEnOtraTarea) {
+                            // Mismo número, disponible y ya armado en OTRA tarea: es un
+                            // posible duplicado físico (dos dosímetros con el mismo
+                            // número). No se sobrescribe el existente: se carga una
+                            // copia y se avisa para resolverlo en el módulo Duplicados
+                            // (sacar uno y dejarlo de backup).
+                            Dosimetro copia = nuevoDosimetro(f);
+                            acciones.add(() -> dosimetroRepository.save(copia));
+                            duplicados++;
+                            alertas.add("Fila " + fila + ": el dosímetro " + f.numero()
+                                    + " ya existe armado en la tarea " + d.getTarea().getNumeroTarea()
+                                    + " y el archivo lo trae en la tarea " + f.tarea().getNumeroTarea()
+                                    + ". Se cargó como copia (posible duplicado). Revísalo en el módulo"
+                                    + " Duplicados para conservar solo uno.");
                         } else {
                             // La mutación se difiere: solo se aplica si el archivo
                             // completo es válido.
@@ -254,7 +273,8 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
             // Todo o nada: solo se persiste si el archivo no tenía ningún error;
             // en caso contrario no se guarda nada y se conserva el detalle de
-            // errores para mostrarlo al usuario.
+            // errores para mostrarlo al usuario. Las alertas (duplicados) no
+            // bloquean, pero si el archivo se rechaza tampoco se aplicaron.
             if (errores.isEmpty()) {
                 acciones.forEach(Runnable::run);
             } else {
@@ -262,6 +282,8 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                 creados = 0;
                 actualizados = 0;
                 sinCambios = 0;
+                duplicados = 0;
+                alertas.clear();
             }
 
             response.setTotalFilas(totalFilas);
@@ -269,7 +291,9 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
             response.setActualizados(actualizados);
             response.setSinCambios(sinCambios);
             response.setFallidas(fallidas);
+            response.setDuplicados(duplicados);
             response.setErrores(errores);
+            response.setAlertas(alertas);
 
         } catch (IOException e) {
             throw new RuntimeException("Error al leer el archivo Excel", e);
