@@ -9,11 +9,10 @@ import Asignar from './pages/Asignar'
 import Armar from './pages/Armar'
 import Dosimetros from './pages/Dosimetros'
 import Clientes from './pages/Clientes'
-import Ejecutivos from './pages/Ejecutivos'
 import Duplicados from './pages/Duplicados'
 import TiposPorta from './pages/TiposPorta'
 import Importar from './pages/Importar'
-import Usuarios from './pages/Usuarios'
+import UsuariosEjecutivos from './pages/UsuariosEjecutivos'
 import MisDosimetros from './pages/MisDosimetros'
 import MisAsignaciones from './pages/MisAsignaciones'
 import MisClientes from './pages/MisClientes'
@@ -53,11 +52,14 @@ export default function App() {
         <Route path="/pendiente-envio" element={<Navigate to="/pendiente-asignacion" replace />} />
         <Route path="/buscar" element={<Navigate to="/dosimetros" replace />} />
         <Route path="/clientes" element={<ProtectedRoute roles={OPER}><Clientes /></ProtectedRoute>} />
-        <Route path="/ejecutivos" element={<ProtectedRoute roles={OPER}><Ejecutivos /></ProtectedRoute>} />
         <Route path="/duplicados" element={<ProtectedRoute roles={OPER}><Duplicados /></ProtectedRoute>} />
         <Route path="/tipos-porta" element={<ProtectedRoute roles={OPER}><TiposPorta /></ProtectedRoute>} />
         <Route path="/importar" element={<ProtectedRoute roles={['ADMIN']}><Importar /></ProtectedRoute>} />
-        <Route path="/usuarios" element={<ProtectedRoute roles={['ADMIN']}><Usuarios /></ProtectedRoute>} />
+        {/* Módulo unificado: usuarios de acceso (ADMIN) + ejecutivos (ADMIN/OPERADOR) */}
+        <Route path="/usuarios-ejecutivos" element={<ProtectedRoute roles={OPER}><UsuariosEjecutivos /></ProtectedRoute>} />
+        {/* Compatibilidad con rutas antiguas */}
+        <Route path="/ejecutivos" element={<Navigate to="/usuarios-ejecutivos" replace />} />
+        <Route path="/usuarios" element={<Navigate to="/usuarios-ejecutivos?tab=usuarios" replace />} />
         <Route
           path="/mis-dosimetros"
           element={<ProtectedRoute roles={['EJECUTIVO']}><MisDosimetros /></ProtectedRoute>}
