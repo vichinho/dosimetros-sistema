@@ -43,7 +43,11 @@ export default function Importar() {
     try {
       const { data } = await client.post('/dosimetros/importacion/excel', formData)
       setResultado(data)
-      toast.success(`Importación completada: ${data.exitosas} exitosas, ${data.fallidas} fallidas`)
+      if (data.aplicado === false) {
+        toast.error('El archivo tiene errores. No se importó nada; corrígelos y vuelve a subirlo.')
+      } else {
+        toast.success(`Importación completada: ${data.exitosas} exitosas, ${data.fallidas} fallidas`)
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'No se pudo importar el archivo'
       setError(msg)
@@ -87,6 +91,14 @@ export default function Importar() {
 
       {resultado && (
         <Card title="Resultado de la importación">
+          {resultado.aplicado === false && (
+            <div className="mb-4">
+              <Alert type="error">
+                El archivo contiene datos erróneos, por lo que <b>no se importó ningún registro</b>.
+                Corrige los errores del listado y vuelve a subir el archivo.
+              </Alert>
+            </div>
+          )}
           <div className="flex gap-6 text-sm mb-4">
             <span>Total filas: <b>{resultado.totalFilas}</b></span>
             <span className="text-green-600">Exitosas: <b>{resultado.exitosas}</b></span>

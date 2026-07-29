@@ -9,9 +9,19 @@ public class ImportacionDosimetrosResponse {
     private int exitosas;
     private int fallidas;
     private int omitidas;
+    // Si el archivo tenía errores no se guarda nada (todo o nada): aplicado = false.
+    private boolean aplicado = true;
     private List<String> errores = new ArrayList<>();
 
     public ImportacionDosimetrosResponse() {
+    }
+
+    public boolean isAplicado() {
+        return aplicado;
+    }
+
+    public void setAplicado(boolean aplicado) {
+        this.aplicado = aplicado;
     }
 
     public int getOmitidas() {

@@ -114,15 +114,27 @@ export const marcarEnvioAsignaciones = (data) =>
   client.patch('/asignaciones/envio', data).then((r) => r.data)
 export const getMisPendientesEnvio = (params) =>
   client.get('/ejecutivo/pendientes-envio', { params }).then((r) => r.data)
+export const getResumenClienteTrimestre = (params) =>
+  client.get('/asignaciones/resumen-cliente-trimestre', { params }).then((r) => r.data)
+export const getMisResumenClienteTrimestre = () =>
+  client.get('/ejecutivo/resumen-cliente-trimestre').then((r) => r.data)
 export const correccionMasivaAsignaciones = (data) =>
   client.patch('/asignaciones/correccion-masiva', data).then((r) => r.data)
+export const editarAsignacion = (id, data) =>
+  client.patch(`/asignaciones/${id}`, data).then((r) => r.data)
 export const getDisponiblesPorNumero = (numero) =>
   client.get('/dosimetros/disponible-por-numero', { params: { numero } }).then((r) => r.data)
-export const importarAsignacionesExcel = (file) => {
+export const importarAsignacionesExcel = (file, validar = false) => {
   const formData = new FormData()
   formData.append('file', file)
-  return client.post('/asignaciones/importacion', formData).then((r) => r.data)
+  return client
+    .post('/asignaciones/importacion', formData, { params: { validar } })
+    .then((r) => r.data)
 }
+export const descargarPlantillaAsignaciones = () =>
+  client.get('/asignaciones/importacion/plantilla', { responseType: 'blob' }).then((r) => r.data)
+export const exportarAsignacionesPorIds = (ids) =>
+  client.post('/asignaciones/exportar', ids, { responseType: 'blob' }).then((r) => r.data)
 
 // --- Vistas del ejecutivo ---
 export const getMisClientes = () => client.get('/ejecutivo/mis-clientes').then((r) => r.data)

@@ -15,9 +15,40 @@ public class ActualizacionStockResponse {
     private int actualizados;
     private int sinCambios;
     private int fallidas;
+    // Número que ya existía armado en otra tarea y se cargó como copia
+    // (posible duplicado físico a resolver en el módulo Duplicados).
+    private int duplicados;
+    // Si el archivo tenía errores no se guarda nada (todo o nada): aplicado = false.
+    private boolean aplicado = true;
     private List<String> errores = new ArrayList<>();
+    // Avisos no bloqueantes (no impiden la carga): duplicados detectados, etc.
+    private List<String> alertas = new ArrayList<>();
 
     public ActualizacionStockResponse() {
+    }
+
+    public int getDuplicados() {
+        return duplicados;
+    }
+
+    public void setDuplicados(int duplicados) {
+        this.duplicados = duplicados;
+    }
+
+    public List<String> getAlertas() {
+        return alertas;
+    }
+
+    public void setAlertas(List<String> alertas) {
+        this.alertas = alertas;
+    }
+
+    public boolean isAplicado() {
+        return aplicado;
+    }
+
+    public void setAplicado(boolean aplicado) {
+        this.aplicado = aplicado;
     }
 
     public int getTotalFilas() {

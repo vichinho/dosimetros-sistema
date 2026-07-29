@@ -131,18 +131,78 @@ class ActualizacionStockServiceTest {
     }
 
     @Test
-    void upsertNoTocaDosimetrosAsignados() {
+    void upsertRearmaDosimetroAsignadoYLoDejaDisponible() {
+        // El dosímetro volvió a la oficina: aunque figure "asignado" a un cliente
+        // anterior, se puede rearmar con una tarea nueva y queda disponible.
         seedDosimetro(500, gringo, 1, 1, "asignado");
 
         ActualizacionStockResponse resp = service.actualizarStockExcel(excel(new String[][]{
-                {"500", "TLD", "Viejo", "1765", "9", "9"}, // asignado -> bloqueado
+                {"500", "TLD", "Viejo", "1765", "9", "9"}, // se rearma
         }));
 
+        assertEquals(0, resp.getFallidas());
+        assertEquals(1, resp.getActualizados());
+        Dosimetro d500 = dosimetroRepository.findByNumeroOrderByIdAsc(500).get(0);
+        assertEquals(viejo.getId(), d500.getTipoPorta().getId());
+        assertEquals("disponible", d500.getEstado());
+    }
+
+    @Test
+    void upsertNoTocaDosimetrosDadosDeBaja() {
+        seedDosimetro(600, gringo, 1, 1, "baja");
+
+        ActualizacionStockResponse resp = service.actualizarStockExcel(excel(new String[][]{
+                {"600", "TLD", "Viejo", "1765", "9", "9"}, // dado de baja -> bloqueado
+        }));
+
+        assertEquals(false, resp.isAplicado());
         assertEquals(1, resp.getFallidas());
         assertEquals(0, resp.getActualizados());
-        // Se mantiene la porta original.
-        Dosimetro d500 = dosimetroRepository.findByNumeroOrderByIdAsc(500).get(0);
-        assertEquals(gringo.getId(), d500.getTipoPorta().getId());
+        // Se mantiene la porta y el estado originales.
+        Dosimetro d600 = dosimetroRepository.findByNumeroOrderByIdAsc(600).get(0);
+        assertEquals(gringo.getId(), d600.getTipoPorta().getId());
+        assertEquals("baja", d600.getEstado());
+    }
+
+    @Test
+    void archivoConErroresNoAplicaNada() {
+        // Una fila válida (nueva) y una inválida (tipo de dosímetro inexistente).
+        // Al haber error, no se guarda nada y el resumen queda en cero.
+        ActualizacionStockResponse resp = service.actualizarStockExcel(excel(new String[][]{
+                {"900", "TLD", "Gringo", "1765", "5", "5"}, // válida (sería creada)
+                {"901", "NO_EXISTE", "Gringo", "1765", "6", "6"}, // tipo inexistente -> error
+        }));
+
+        assertEquals(false, resp.isAplicado());
+        assertEquals(0, resp.getCreados());
+        assertEquals(0, resp.getActualizados());
+        assertEquals(0, resp.getSinCambios());
+        assertEquals(1, resp.getFallidas());
+        org.junit.jupiter.api.Assertions.assertFalse(resp.getErrores().isEmpty());
+    }
+
+    @Test
+    void upsertCargaCopiaYAvisaSiElNumeroYaEstaArmadoEnOtraTarea() {
+        // Existe el 800 disponible, armado en la tarea 1765.
+        seedDosimetro(800, gringo, 1, 2, "disponible");
+        // Tarea alternativa para simular un posible duplicado físico.
+        Tarea tarea8440 = new Tarea();
+        tarea8440.setNumeroTarea("8440");
+        tarea8440.setFechaCreacion(LocalDate.of(2025, 1, 1));
+        tareaRepository.save(tarea8440);
+
+        ActualizacionStockResponse resp = service.actualizarStockExcel(excel(new String[][]{
+                {"800", "TLD", "Gringo", "8440", "2", "1"}, // mismo número, otra tarea
+        }));
+
+        // No se sobrescribe: se carga una copia y se avisa (no bloquea).
+        assertEquals(true, resp.isAplicado());
+        assertEquals(0, resp.getActualizados());
+        assertEquals(1, resp.getDuplicados());
+        assertEquals(0, resp.getFallidas());
+        org.junit.jupiter.api.Assertions.assertFalse(resp.getAlertas().isEmpty());
+        // Ahora existen dos dosímetros con el número 800.
+        assertEquals(2, dosimetroRepository.findByNumeroOrderByIdAsc(800).size());
     }
 
     @Test

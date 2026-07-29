@@ -14,10 +14,12 @@ import {
   marcarStockEmergencia,
   buscarAsignaciones,
   correccionMasivaAsignaciones,
+  editarAsignacion,
 } from '../api/endpoints'
 import { Card, Button, Input, Select, Badge, Alert, Loading, EmptyState, Modal } from '../components/ui'
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
+import { useNavigate } from 'react-router-dom'
 
 const estadoColor = { disponible: 'green', asignado: 'blue', baja: 'red', dañado: 'amber' }
 
@@ -61,6 +63,9 @@ export default function Dosimetros() {
         <Edicion
           tiposDosimetro={tiposDosimetro}
           portas={portas}
+          clientes={clientes}
+          ejecutivos={ejecutivos}
+          empresas={empresas}
           toast={toast}
         />
       )}
@@ -80,12 +85,14 @@ export default function Dosimetros() {
 // ---------------------------------------------------------------------------
 // Vista 1: Edición individual (buscar por número, editar specs, cambiar estado)
 // ---------------------------------------------------------------------------
-function Edicion({ tiposDosimetro, portas, toast }) {
+function Edicion({ tiposDosimetro, portas, clientes, ejecutivos, empresas, toast }) {
+  const navigate = useNavigate()
   const [numero, setNumero] = useState('')
   const [resultados, setResultados] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [editando, setEditando] = useState(null) // dosímetro en edición
+  const [editando, setEditando] = useState(null) // dosímetro en edición (especificaciones)
+  const [editandoAsig, setEditandoAsig] = useState(null) // asignación del historial en edición
 
   const buscar = async (e) => {
     e?.preventDefault()
@@ -150,13 +157,20 @@ function Edicion({ tiposDosimetro, portas, toast }) {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs text-ink/50">Dosímetro · id interno {d.id}</p>
-              <h2 className="text-2xl font-bold text-ink leading-tight">#{d.numero}</h2>
+              <h2 className="text-2xl font-bold text-ink leading-tight">{d.numero}</h2>
               <div className="flex items-center gap-2 mt-1">
                 <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
                 {d.observacion && <Badge color="amber">{d.observacion}</Badge>}
               </div>
             </div>
-            <Button variant="secondary" onClick={() => setEditando(d)}>Editar especificaciones</Button>
+            <div className="flex flex-col gap-2">
+              <Button variant="secondary" onClick={() => setEditando(d)}>Editar especificaciones</Button>
+              {d.estado === 'disponible' && (
+                <Button variant="secondary" onClick={() => navigate(`/asignar?vista=individual&numero=${d.numero}`)}>
+                  Asignar (individual)
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
@@ -202,9 +216,16 @@ function Edicion({ tiposDosimetro, portas, toast }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge color="blue">{a.trimestre}</Badge>
                       <span className="text-xs text-ink/50">{a.fechaAsignacion}</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditandoAsig(a)}
+                        className="text-xs text-steel hover:underline ml-auto"
+                      >
+                        Editar
+                      </button>
                     </div>
                     <p className="text-sm font-semibold text-ink mt-1">{a.clienteNombre}</p>
-                    <p className="text-xs text-ink/60">{a.ejecutivoNombre} · {a.empresaNombre}</p>
+                    <p className="text-xs text-ink/60">{a.ejecutivoNombre} · {a.empresaNombre} · {a.tipoPortaNombre}</p>
                     {a.linkTrello && (
                       <a href={a.linkTrello} target="_blank" rel="noreferrer" className="text-xs text-steel hover:underline">Ver Trello ↗</a>
                     )}
@@ -226,7 +247,82 @@ function Edicion({ tiposDosimetro, portas, toast }) {
           toast={toast}
         />
       )}
+
+      {editandoAsig && (
+        <ModalEditarAsignacion
+          asignacion={editandoAsig}
+          clientes={clientes}
+          ejecutivos={ejecutivos}
+          empresas={empresas}
+          portas={portas}
+          onClose={() => setEditandoAsig(null)}
+          onGuardado={() => { setEditandoAsig(null); recargar() }}
+          toast={toast}
+        />
+      )}
     </div>
+  )
+}
+
+// Modal para editar una asignación del historial (incluido el cliente).
+function ModalEditarAsignacion({ asignacion, clientes, ejecutivos, empresas, portas, onClose, onGuardado, toast }) {
+  const [form, setForm] = useState({
+    clienteId: asignacion.clienteId ?? '',
+    ejecutivoId: asignacion.ejecutivoId ?? '',
+    empresaId: asignacion.empresaId ?? '',
+    tipoPortaId: asignacion.tipoPortaId ?? '',
+    trimestre: asignacion.trimestre ?? '',
+    linkTrello: asignacion.linkTrello ?? '',
+  })
+  const [guardando, setGuardando] = useState(false)
+  const set = (campo) => (v) => setForm((f) => ({ ...f, [campo]: v }))
+
+  const guardar = async () => {
+    if (!form.clienteId || !form.ejecutivoId || !form.empresaId || !form.tipoPortaId) {
+      return toast.error('Completa cliente, ejecutivo, empresa y porta')
+    }
+    if (!form.trimestre.trim() || !form.linkTrello.trim()) {
+      return toast.error('Trimestre y link de Trello son obligatorios')
+    }
+    setGuardando(true)
+    try {
+      await editarAsignacion(asignacion.id, {
+        clienteId: Number(form.clienteId),
+        ejecutivoId: Number(form.ejecutivoId),
+        empresaId: Number(form.empresaId),
+        tipoPortaId: Number(form.tipoPortaId),
+        trimestre: form.trimestre.trim().toUpperCase(),
+        linkTrello: form.linkTrello.trim(),
+      })
+      toast.success('Asignación actualizada')
+      onGuardado()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo guardar la asignación')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Modal title={`Editar asignación · dosímetro ${asignacion.numeroDosimetro}`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-xs text-ink/50">La tarea, bandeja y slot no se editan (vienen del dosímetro).</p>
+        <Combobox label="Cliente" options={clientes.map((c) => ({ value: c.id, label: c.razonSocial }))}
+          value={form.clienteId} onChange={set('clienteId')} />
+        <Combobox label="Ejecutivo" options={ejecutivos.map((e) => ({ value: e.id, label: e.nombre }))}
+          value={form.ejecutivoId} onChange={set('ejecutivoId')} />
+        <Combobox label="Empresa" options={empresas.map((e) => ({ value: e.id, label: e.nombre }))}
+          value={form.empresaId} onChange={set('empresaId')} />
+        <Combobox label="Tipo de porta" options={portas.map((p) => ({ value: p.id, label: p.nombre }))}
+          value={form.tipoPortaId} onChange={set('tipoPortaId')} />
+        <Input label="Trimestre" value={form.trimestre} onChange={(e) => set('trimestre')(e.target.value)} placeholder="Ej: 2T2026" />
+        <Input label="Link de Trello" value={form.linkTrello} onChange={(e) => set('linkTrello')(e.target.value)} placeholder="https://trello.com/c/…" />
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button onClick={guardar} disabled={guardando}>{guardando ? 'Guardando…' : 'Guardar'}</Button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
@@ -260,7 +356,7 @@ function ModalEditar({ dosimetro, tiposDosimetro, portas, onClose, onGuardado, t
   }
 
   return (
-    <Modal title={`Editar dosímetro #${dosimetro.numero}`} onClose={onClose}>
+    <Modal title={`Editar dosímetro ${dosimetro.numero}`} onClose={onClose}>
       <div className="space-y-4">
         <p className="text-xs text-ink/50">La tarea, bandeja y slot no se editan aquí (se gestionan en Armar/Asignar).</p>
         <Input label="Número" type="number" value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} />
@@ -445,7 +541,7 @@ function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
                     {resultados.map((a) => (
                       <tr key={a.id} className={`border-b border-slate-100 ${seleccion.has(a.id) ? 'bg-steel/5' : ''}`}>
                         <td className="py-2"><input type="checkbox" checked={seleccion.has(a.id)} onChange={() => toggle(a.id)} /></td>
-                        <td className="py-2 font-medium text-ink">#{a.numeroDosimetro}</td>
+                        <td className="py-2 font-medium text-ink">{a.numeroDosimetro}</td>
                         <td className="py-2 text-slate-600">{a.clienteNombre}</td>
                         <td className="py-2 text-slate-600">{a.ejecutivoNombre}</td>
                         <td className="py-2 text-slate-600">{a.empresaNombre}</td>

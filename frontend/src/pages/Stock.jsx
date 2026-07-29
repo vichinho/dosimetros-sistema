@@ -1,70 +1,99 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   getStock,
-  getStockMatriz,
   getTiposDosimetro,
   getTiposPorta,
   getStockPortas,
   exportarStockExcel,
   actualizarStockExcel,
+  descargarPlantillaDosimetros,
   marcarDanado,
   marcarBueno,
   liberarDosimetro,
 } from '../api/endpoints'
-import { Card, Select, Badge, Button, Loading, EmptyState, Pagination, Alert, Modal } from '../components/ui'
+import { Card, Select, Badge, Button, Loading, EmptyState, Alert, Modal } from '../components/ui'
 import { useToast } from '../components/Toast'
 
 const estadoColor = { disponible: 'green', asignado: 'blue', baja: 'red', dañado: 'amber' }
-const POR_PAGINA = 20
 
-// Arma la matriz tarea × porta a partir de las celdas planas del backend.
-function armarMatriz(celdas) {
-  const columnas = []
-  const colVistas = new Map()
-  const filasMap = new Map()
-  for (const c of celdas) {
-    if (!colVistas.has(c.tipoPortaId)) {
-      colVistas.set(c.tipoPortaId, true)
-      columnas.push({ id: c.tipoPortaId, nombre: c.tipoPortaNombre })
-    }
-    if (!filasMap.has(c.tareaId)) {
-      filasMap.set(c.tareaId, { tareaId: c.tareaId, numeroTarea: c.numeroTarea, celdas: {}, total: 0 })
-    }
-    const fila = filasMap.get(c.tareaId)
-    fila.celdas[c.tipoPortaId] = c.cantidad
-    fila.total += c.cantidad
+// Construye el árbol jerárquico Tipo → Porta → Tarea → Bandeja → Slot.
+function construirArbol(dosimetros) {
+  const tipos = new Map()
+  for (const d of dosimetros) {
+    const tKey = d.tipoDosimetroNombre || 'Sin tipo'
+    if (!tipos.has(tKey)) tipos.set(tKey, { nombre: tKey, total: 0, portas: new Map() })
+    const tipo = tipos.get(tKey)
+    tipo.total++
+    const pKey = d.tipoPortaNombre || 'Sin porta'
+    if (!tipo.portas.has(pKey)) tipo.portas.set(pKey, { nombre: pKey, total: 0, tareas: new Map() })
+    const porta = tipo.portas.get(pKey)
+    porta.total++
+    const taKey = d.numeroTarea || 'Sin tarea'
+    if (!porta.tareas.has(taKey)) porta.tareas.set(taKey, { nombre: taKey, total: 0, bandejas: new Map() })
+    const tarea = porta.tareas.get(taKey)
+    tarea.total++
+    const bKey = d.numeroBandeja != null ? d.numeroBandeja : 'Sin bandeja'
+    if (!tarea.bandejas.has(bKey)) tarea.bandejas.set(bKey, { nombre: bKey, total: 0, slots: [] })
+    const bandeja = tarea.bandejas.get(bKey)
+    bandeja.total++
+    bandeja.slots.push(d)
   }
-  columnas.sort((a, b) => a.nombre.localeCompare(b.nombre))
-  const filas = [...filasMap.values()].sort((a, b) =>
-    String(a.numeroTarea).localeCompare(String(b.numeroTarea), undefined, { numeric: true })
+  const txt = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })
+  return [...tipos.values()]
+    .sort((a, b) => txt(a.nombre, b.nombre))
+    .map((tipo) => ({
+      ...tipo,
+      portas: [...tipo.portas.values()]
+        .sort((a, b) => txt(a.nombre, b.nombre))
+        .map((porta) => ({
+          ...porta,
+          tareas: [...porta.tareas.values()]
+            .sort((a, b) => txt(a.nombre, b.nombre))
+            .map((tarea) => ({
+              ...tarea,
+              bandejas: [...tarea.bandejas.values()]
+                .sort((a, b) => (Number(a.nombre) || 0) - (Number(b.nombre) || 0))
+                .map((bandeja) => ({
+                  ...bandeja,
+                  slots: bandeja.slots.sort((a, b) => (a.slotBandeja ?? 0) - (b.slotBandeja ?? 0)),
+                })),
+            })),
+        })),
+    }))
+}
+
+// Encabezado colapsable de un nivel del árbol.
+function Fila({ nivel, abierto, onClick, label, count }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ paddingLeft: nivel * 18 + 12 }}
+      className="w-full flex items-center justify-between py-2 pr-3 text-left border-b border-slate-100 hover:bg-mist/10"
+    >
+      <span className="flex items-center gap-2">
+        <span className="text-ink/40 w-3">{abierto ? '▾' : '▸'}</span>
+        <span className={nivel === 0 ? 'font-semibold text-ink' : 'text-ink/80'}>{label}</span>
+      </span>
+      <Badge color="slate">{count}</Badge>
+    </button>
   )
-  const totalesCol = {}
-  let totalGeneral = 0
-  for (const col of columnas) totalesCol[col.id] = 0
-  for (const fila of filas) {
-    for (const col of columnas) {
-      totalesCol[col.id] += fila.celdas[col.id] || 0
-    }
-    totalGeneral += fila.total
-  }
-  return { columnas, filas, totalesCol, totalGeneral }
 }
 
 export default function Stock() {
   const [tipos, setTipos] = useState([])
   const [portas, setPortas] = useState([])
   const [filtros, setFiltros] = useState({ tipoDosimetroId: '', tipoPortaId: '', estado: 'disponible' })
-  const [vista, setVista] = useState('dinamica') // 'dinamica' (tarea × porta) | 'lista'
   const [dosimetros, setDosimetros] = useState([])
-  const [matriz, setMatriz] = useState([])
   const [detallePortas, setDetallePortas] = useState([])
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  // Drill-down de la matriz: detalle de dosímetros de una tarea (opcional: porta)
-  const [drill, setDrill] = useState(null) // { numeroTarea, portaNombre }
-  const [drillData, setDrillData] = useState([])
-  const [drillLoading, setDrillLoading] = useState(false)
-  // #8 Actualización de stock por archivo (upsert)
+  const [expandidos, setExpandidos] = useState(() => new Set())
+  // Tarjeta de porta clicable → tareas de esa porta
+  const [portaSel, setPortaSel] = useState(null) // { tipoPortaId, portaNombre }
+  const [portaDosimetros, setPortaDosimetros] = useState([])
+  const [portaLoading, setPortaLoading] = useState(false)
+  const [tareasAbiertas, setTareasAbiertas] = useState(() => new Set())
+  // Actualización de stock por archivo (upsert)
   const [archivo, setArchivo] = useState(null)
   const [subiendo, setSubiendo] = useState(false)
   const [resultado, setResultado] = useState(null)
@@ -87,58 +116,33 @@ export default function Stock() {
 
   const cargar = useCallback(() => {
     setLoading(true)
-    if (vista === 'dinamica') {
-      const params = {}
-      if (filtros.tipoDosimetroId) params.tipoDosimetroId = filtros.tipoDosimetroId
-      if (filtros.estado) params.estado = filtros.estado
-      getStockMatriz(params)
-        .then(setMatriz)
-        .catch(() => toast.error('No se pudo cargar la vista dinámica'))
-        .finally(() => setLoading(false))
-    } else {
-      getStock(construirParams())
-        .then((data) => {
-          setDosimetros(data)
-          setPage(1)
-        })
-        .catch(() => toast.error('No se pudo cargar el stock'))
-        .finally(() => setLoading(false))
-    }
-  }, [vista, filtros, construirParams, toast])
+    getStock(construirParams())
+      .then(setDosimetros)
+      .catch(() => toast.error('No se pudo cargar el stock'))
+      .finally(() => setLoading(false))
+  }, [construirParams, toast])
 
   useEffect(() => {
     cargar()
   }, [cargar])
 
-  const onExportar = async () => {
+  const recargarDetalle = () => getStockPortas().then(setDetallePortas).catch(() => {})
+
+  const bajar = (getter, nombre) => async () => {
     try {
-      const blob = await exportarStockExcel(construirParams())
+      const blob = await getter()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'stock.xlsx'
+      a.download = nombre
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('No se pudo exportar el stock')
+      toast.error('No se pudo descargar el archivo')
     }
   }
-
-  const recargarDetalle = () => getStockPortas().then(setDetallePortas).catch(() => {})
-
-  // Abre el detalle de dosímetros de una tarea (opcionalmente acotado a una porta).
-  const abrirDrill = (fila, col) => {
-    setDrill({ numeroTarea: fila.numeroTarea, portaNombre: col?.nombre || null })
-    setDrillLoading(true)
-    const params = { tareaId: fila.tareaId }
-    if (filtros.tipoDosimetroId) params.tipoDosimetroId = filtros.tipoDosimetroId
-    if (filtros.estado) params.estado = filtros.estado
-    if (col) params.tipoPortaId = col.id
-    getStock(params)
-      .then(setDrillData)
-      .catch(() => toast.error('No se pudo cargar el detalle de la tarea'))
-      .finally(() => setDrillLoading(false))
-  }
+  const onExportar = bajar(() => exportarStockExcel(construirParams()), 'stock.xlsx')
+  const descargarPlantilla = bajar(descargarPlantillaDosimetros, 'plantilla_carga_dosimetros.xlsx')
 
   const onActualizarArchivo = async (e) => {
     e.preventDefault()
@@ -152,11 +156,20 @@ export default function Stock() {
     try {
       const data = await actualizarStockExcel(archivo)
       setResultado(data)
-      toast.success(
-        `Actualización: ${data.creados} creados, ${data.actualizados} actualizados, ${data.sinCambios} sin cambios`
-      )
-      cargar()
-      recargarDetalle()
+      if (data.aplicado === false) {
+        // El archivo tenía errores: no se guardó nada. Se muestra el detalle abajo.
+        toast.error('El archivo tiene errores. No se guardó ningún cambio; corrígelos y vuelve a subirlo.')
+      } else {
+        const extraDup = data.duplicados ? `, ${data.duplicados} duplicados` : ''
+        toast.success(
+          `Actualización: ${data.creados} creados, ${data.actualizados} actualizados, ${data.sinCambios} sin cambios${extraDup}`
+        )
+        if (data.duplicados) {
+          toast.error(`${data.duplicados} posible(s) duplicado(s). Revísalos en el módulo Duplicados.`)
+        }
+        cargar()
+        recargarDetalle()
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'No se pudo actualizar el stock'
       setErrorArchivo(msg)
@@ -180,21 +193,68 @@ export default function Stock() {
   const onLiberar = conAccion(liberarDosimetro, 'Dosímetro liberado (vuelve a disponible)')
   const onMarcarBueno = conAccion(marcarBueno, 'Dosímetro marcado como bueno (disponible)')
 
+  // Abre el modal con las tareas disponibles de una porta.
+  const abrirPorta = (p) => {
+    setPortaSel({ tipoPortaId: p.tipoPortaId, portaNombre: p.portaNombre })
+    setTareasAbiertas(new Set())
+    setPortaLoading(true)
+    getStock({ tipoPortaId: p.tipoPortaId, estado: 'disponible' })
+      .then(setPortaDosimetros)
+      .catch(() => toast.error('No se pudieron cargar las tareas de la porta'))
+      .finally(() => setPortaLoading(false))
+  }
+
+  const toggle = (setter) => (key) =>
+    setter((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  const toggleNodo = toggle(setExpandidos)
+  const toggleTarea = toggle(setTareasAbiertas)
+
   const portasFiltradas = filtros.tipoDosimetroId
     ? portas.filter((p) => String(p.tipoDosimetroId) === String(filtros.tipoDosimetroId))
     : portas
 
   const totalDisponibles = detallePortas.reduce((acc, p) => acc + (p.cantidad || 0), 0)
-  const totalPages = Math.ceil(dosimetros.length / POR_PAGINA)
-  const visibles = dosimetros.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
-  const pivot = useMemo(() => armarMatriz(matriz), [matriz])
+  const arbol = useMemo(() => construirArbol(dosimetros), [dosimetros])
+
+  // Tareas de la porta seleccionada (agrupadas desde los dosímetros ya traídos).
+  const tareasPorta = useMemo(() => {
+    const map = new Map()
+    for (const d of portaDosimetros) {
+      const k = d.numeroTarea || 'Sin tarea'
+      if (!map.has(k)) map.set(k, { numeroTarea: k, dosimetros: [] })
+      map.get(k).dosimetros.push(d)
+    }
+    return [...map.values()].sort((a, b) =>
+      String(a.numeroTarea).localeCompare(String(b.numeroTarea), undefined, { numeric: true })
+    )
+  }, [portaDosimetros])
+
+  const accionesSlot = (d) => (
+    <>
+      {d.estado === 'asignado' && (
+        <button onClick={() => onLiberar(d.id)} className="text-steel hover:underline text-sm">Liberar</button>
+      )}
+      {d.estado === 'disponible' && (
+        <button onClick={() => onMarcarDanado(d.id)} className="text-amber-600 hover:underline text-sm">Marcar dañado</button>
+      )}
+      {d.estado === 'dañado' && (
+        <button onClick={() => onMarcarBueno(d.id)} className="text-steel hover:underline text-sm">Marcar bueno</button>
+      )}
+    </>
+  )
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-ink">Stock de dosímetros</h1>
 
-      {/* #5 Portas disponibles: se muestran TODAS, incluidas las que están en 0 */}
+      {/* Stock por porta: TODAS las portas (incluidas las que están en 0), clicables */}
       <Card title={`Stock por porta · ${totalDisponibles} disponibles en total`}>
+        <p className="text-sm text-slate-500 mb-3">Toca una porta para ver sus tareas disponibles.</p>
         {detallePortas.length === 0 ? (
           <EmptyState>No hay tipos de porta registrados</EmptyState>
         ) : (
@@ -202,21 +262,28 @@ export default function Stock() {
             {detallePortas.map((p) => {
               const enCero = !p.cantidad
               return (
-                <div
+                <button
                   key={p.tipoPortaId}
-                  className={`border rounded-xl p-3 ${enCero ? 'border-mist/40 bg-mist/10' : 'border-mist/60'}`}
+                  type="button"
+                  onClick={() => abrirPorta(p)}
+                  disabled={enCero}
+                  className={`text-left border rounded-xl p-3 transition ${
+                    enCero
+                      ? 'border-mist/40 bg-mist/10 cursor-default'
+                      : 'border-mist/60 hover:border-steel hover:shadow-sm'
+                  }`}
                 >
                   <p className={`text-2xl font-bold ${enCero ? 'text-ink/30' : 'text-ink'}`}>{p.cantidad}</p>
                   <p className="text-sm font-medium text-ink/80">{p.portaNombre}</p>
                   <p className="text-xs text-slate-500">{p.tipoDosimetroNombre}</p>
-                </div>
+                </button>
               )
             })}
           </div>
         )}
       </Card>
 
-      {/* #8 Actualización de stock por archivo (upsert por número) */}
+      {/* Actualización de stock por archivo (upsert por número) */}
       <Card title="Actualizar stock por archivo">
         <form onSubmit={onActualizarArchivo} className="space-y-3">
           <p className="text-sm text-slate-500">
@@ -225,6 +292,11 @@ export default function Stock() {
             existe se crea, si cambió se actualiza y si es idéntico se deja igual. Los
             dosímetros asignados o dados de baja no se modifican.
           </p>
+          <div>
+            <Button type="button" variant="secondary" onClick={descargarPlantilla}>
+              Descargar plantilla
+            </Button>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="file"
@@ -240,13 +312,36 @@ export default function Stock() {
         {errorArchivo && <div className="mt-3"><Alert type="error">{errorArchivo}</Alert></div>}
         {resultado && (
           <div className="mt-4">
+            {resultado.aplicado === false && (
+              <div className="mb-3">
+                <Alert type="error">
+                  El archivo contiene datos erróneos, por lo que <b>no se guardó ningún cambio</b>.
+                  Corrige los errores del listado y vuelve a subir el archivo.
+                </Alert>
+              </div>
+            )}
             <div className="flex flex-wrap gap-4 text-sm mb-3">
               <span>Total filas: <b>{resultado.totalFilas}</b></span>
               <span className="text-emerald-600">Creados: <b>{resultado.creados}</b></span>
               <span className="text-steel">Actualizados: <b>{resultado.actualizados}</b></span>
               <span className="text-ink/60">Sin cambios: <b>{resultado.sinCambios}</b></span>
+              {resultado.duplicados > 0 && (
+                <span className="text-amber-600">Duplicados: <b>{resultado.duplicados}</b></span>
+              )}
               <span className="text-red-600">Con problemas: <b>{resultado.fallidas}</b></span>
             </div>
+            {resultado.alertas?.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 max-h-60 overflow-auto">
+                <p className="text-sm font-medium text-amber-800 mb-1">
+                  Posibles duplicados (se cargaron; resuélvelos en el módulo Duplicados):
+                </p>
+                <ul className="text-sm text-amber-700 space-y-1">
+                  {resultado.alertas.map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {resultado.errores?.length > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-60 overflow-auto">
                 <ul className="text-sm text-red-700 space-y-1">
@@ -260,27 +355,8 @@ export default function Stock() {
         )}
       </Card>
 
-      {/* Filtros + selector de vista */}
-      <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-sm font-medium text-ink/70">Vista:</span>
-          <div className="inline-flex rounded-lg border border-mist overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setVista('dinamica')}
-              className={`px-3 py-1.5 text-sm ${vista === 'dinamica' ? 'bg-steel text-white' : 'bg-white text-ink/70 hover:bg-mist/20'}`}
-            >
-              Tabla dinámica (tarea × porta)
-            </button>
-            <button
-              type="button"
-              onClick={() => setVista('lista')}
-              className={`px-3 py-1.5 text-sm ${vista === 'lista' ? 'bg-steel text-white' : 'bg-white text-ink/70 hover:bg-mist/20'}`}
-            >
-              Lista detallada
-            </button>
-          </div>
-        </div>
+      {/* Filtros */}
+      <Card title="Filtros">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Select
             label="Tipo de dosímetro"
@@ -292,19 +368,16 @@ export default function Stock() {
               <option key={t.id} value={t.id}>{t.nombre}</option>
             ))}
           </Select>
-
           <Select
             label="Estado de armado (porta)"
             value={filtros.tipoPortaId}
             onChange={(e) => setFiltros({ ...filtros, tipoPortaId: e.target.value })}
-            disabled={vista === 'dinamica'}
           >
             <option value="">Todos</option>
             {portasFiltradas.map((p) => (
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </Select>
-
           <Select
             label="Estado"
             value={filtros.estado}
@@ -317,188 +390,115 @@ export default function Stock() {
             <option value="">Todos</option>
           </Select>
         </div>
-        {vista === 'dinamica' && (
-          <p className="text-xs text-slate-500 mt-2">
-            La vista dinámica muestra los dosímetros armados (con tarea y porta). El
-            filtro de porta se ignora aquí porque la porta es una columna.
-          </p>
+      </Card>
+
+      {/* Lista detallada jerárquica: Tipo → Porta → Tarea → Bandeja → Slot */}
+      <Card
+        title={`Lista detallada · ${dosimetros.length} dosímetros`}
+        action={
+          <Button variant="secondary" onClick={onExportar} disabled={dosimetros.length === 0}>
+            Exportar a Excel
+          </Button>
+        }
+      >
+        {loading ? (
+          <Loading />
+        ) : arbol.length === 0 ? (
+          <EmptyState>No hay dosímetros con esos filtros</EmptyState>
+        ) : (
+          <div className="border-t border-slate-100">
+            {arbol.map((tipo) => {
+              const kTipo = tipo.nombre
+              return (
+                <div key={kTipo}>
+                  <Fila nivel={0} abierto={expandidos.has(kTipo)} onClick={() => toggleNodo(kTipo)}
+                    label={`Tipo: ${tipo.nombre}`} count={tipo.total} />
+                  {expandidos.has(kTipo) && tipo.portas.map((porta) => {
+                    const kPorta = `${kTipo}|${porta.nombre}`
+                    return (
+                      <div key={kPorta}>
+                        <Fila nivel={1} abierto={expandidos.has(kPorta)} onClick={() => toggleNodo(kPorta)}
+                          label={`Porta: ${porta.nombre}`} count={porta.total} />
+                        {expandidos.has(kPorta) && porta.tareas.map((tarea) => {
+                          const kTarea = `${kPorta}|${tarea.nombre}`
+                          return (
+                            <div key={kTarea}>
+                              <Fila nivel={2} abierto={expandidos.has(kTarea)} onClick={() => toggleNodo(kTarea)}
+                                label={`Tarea ${tarea.nombre}`} count={tarea.total} />
+                              {expandidos.has(kTarea) && tarea.bandejas.map((bandeja) => {
+                                const kBandeja = `${kTarea}|${bandeja.nombre}`
+                                return (
+                                  <div key={kBandeja}>
+                                    <Fila nivel={3} abierto={expandidos.has(kBandeja)} onClick={() => toggleNodo(kBandeja)}
+                                      label={`Bandeja ${bandeja.nombre}`} count={bandeja.total} />
+                                    {expandidos.has(kBandeja) && (
+                                      <div className="bg-cream/30">
+                                        {bandeja.slots.map((d) => (
+                                          <div key={d.id}
+                                            className="flex items-center justify-between text-sm py-1.5 pr-3 border-b border-slate-50"
+                                            style={{ paddingLeft: 4 * 18 + 12 }}>
+                                            <span className="text-ink/80">
+                                              Slot <b>{d.slotBandeja ?? '—'}</b> · dosímetro <b>{d.numero}</b>
+                                            </span>
+                                            <span className="flex items-center gap-3">
+                                              <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
+                                              {accionesSlot(d)}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
         )}
       </Card>
 
-      {/* #6 Vista dinámica: matriz tarea × porta */}
-      {vista === 'dinamica' &&
-        (loading ? (
-          <Loading />
-        ) : (
-          <Card title={`Matriz tarea × porta · ${pivot.totalGeneral} dosímetros`}>
-            {pivot.filas.length === 0 ? (
-              <EmptyState>No hay dosímetros armados con esos filtros</EmptyState>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-slate-500 border-b border-slate-200">
-                      <th className="py-2 pr-4 font-medium sticky left-0 bg-white">Tarea</th>
-                      {pivot.columnas.map((c) => (
-                        <th key={c.id} className="py-2 px-3 font-medium text-right whitespace-nowrap">{c.nombre}</th>
-                      ))}
-                      <th className="py-2 pl-3 font-medium text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pivot.filas.map((f) => (
-                      <tr key={f.tareaId} className="border-b border-slate-100 hover:bg-mist/10">
-                        <td className="py-2 pr-4 font-medium sticky left-0 bg-white">
-                          <button
-                            type="button"
-                            onClick={() => abrirDrill(f)}
-                            className="text-steel hover:underline"
-                            title="Ver dosímetros de la tarea"
-                          >
-                            {f.numeroTarea}
-                          </button>
-                        </td>
-                        {pivot.columnas.map((c) => (
-                          <td key={c.id} className="py-2 px-3 text-right text-slate-600">
-                            {f.celdas[c.id] ? (
-                              <button
-                                type="button"
-                                onClick={() => abrirDrill(f, c)}
-                                className="hover:underline hover:text-steel"
-                                title={`Ver ${c.nombre} de la tarea ${f.numeroTarea}`}
-                              >
-                                {f.celdas[c.id]}
-                              </button>
-                            ) : (
-                              <span className="text-slate-300">·</span>
-                            )}
-                          </td>
+      {/* Modal: tareas de la porta seleccionada */}
+      {portaSel && (
+        <Modal title={`Tareas disponibles · ${portaSel.portaNombre}`} onClose={() => setPortaSel(null)}>
+          {portaLoading ? (
+            <Loading />
+          ) : tareasPorta.length === 0 ? (
+            <EmptyState>Esta porta no tiene dosímetros disponibles.</EmptyState>
+          ) : (
+            <div className="border-t border-slate-100">
+              <p className="text-sm text-ink/60 py-2">{portaDosimetros.length} dosímetros disponibles en {tareasPorta.length} tareas</p>
+              {tareasPorta.map((t) => {
+                const abierta = tareasAbiertas.has(t.numeroTarea)
+                return (
+                  <div key={t.numeroTarea}>
+                    <button type="button" onClick={() => toggleTarea(t.numeroTarea)}
+                      className="w-full flex items-center justify-between py-2 px-1 text-left border-b border-slate-100 hover:bg-mist/10">
+                      <span className="flex items-center gap-2">
+                        <span className="text-ink/40 w-3">{abierta ? '▾' : '▸'}</span>
+                        <span className="text-ink/90">Tarea {t.numeroTarea}</span>
+                      </span>
+                      <Badge color="slate">{t.dosimetros.length}</Badge>
+                    </button>
+                    {abierta && (
+                      <div className="pl-6 pb-2">
+                        {t.dosimetros.map((d) => (
+                          <div key={d.id} className="text-sm text-ink/70 py-1 border-b border-slate-50">
+                            Dosímetro <b>{d.numero}</b>
+                            {d.numeroBandeja != null && <span> · Bandeja {d.numeroBandeja} / Slot {d.slotBandeja}</span>}
+                          </div>
                         ))}
-                        <td className="py-2 pl-3 text-right font-semibold text-ink">{f.total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-200 font-semibold text-ink">
-                      <td className="py-2 pr-4 sticky left-0 bg-white">Total</td>
-                      {pivot.columnas.map((c) => (
-                        <td key={c.id} className="py-2 px-3 text-right">{pivot.totalesCol[c.id]}</td>
-                      ))}
-                      <td className="py-2 pl-3 text-right">{pivot.totalGeneral}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </Card>
-        ))}
-
-      {/* Lista detallada (con acciones por dosímetro) */}
-      {vista === 'lista' && (
-        <Card
-          title={`Resultados (${dosimetros.length})`}
-          action={
-            <Button variant="secondary" onClick={onExportar} disabled={dosimetros.length === 0}>
-              Exportar a Excel
-            </Button>
-          }
-        >
-          {loading ? (
-            <Loading />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-500 border-b border-slate-200">
-                    <th className="py-2 font-medium">Número</th>
-                    <th className="py-2 font-medium">Tipo</th>
-                    <th className="py-2 font-medium">Porta</th>
-                    <th className="py-2 font-medium">Tarea</th>
-                    <th className="py-2 font-medium">Bandeja/Slot</th>
-                    <th className="py-2 font-medium">Estado</th>
-                    <th className="py-2 font-medium text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibles.map((d) => (
-                    <tr key={d.id} className="border-b border-slate-100">
-                      <td className="py-2.5 font-medium text-ink">{d.numero}</td>
-                      <td className="py-2.5 text-slate-600">{d.tipoDosimetroNombre}</td>
-                      <td className="py-2.5 text-slate-600">{d.tipoPortaNombre || <span className="text-slate-400">—</span>}</td>
-                      <td className="py-2.5 text-slate-600">{d.numeroTarea || <span className="text-slate-400">—</span>}</td>
-                      <td className="py-2.5 text-slate-600">
-                        {d.numeroBandeja != null ? `${d.numeroBandeja} / ${d.slotBandeja}` : '—'}
-                      </td>
-                      <td className="py-2.5">
-                        <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
-                      </td>
-                      <td className="py-2.5 text-right">
-                        {d.estado === 'asignado' && (
-                          <button onClick={() => onLiberar(d.id)} className="text-steel hover:underline text-sm">
-                            Liberar
-                          </button>
-                        )}
-                        {d.estado === 'disponible' && (
-                          <button onClick={() => onMarcarDanado(d.id)} className="text-amber-600 hover:underline text-sm">
-                            Marcar dañado
-                          </button>
-                        )}
-                        {d.estado === 'dañado' && (
-                          <button onClick={() => onMarcarBueno(d.id)} className="text-steel hover:underline text-sm">
-                            Marcar bueno
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {dosimetros.length === 0 && <EmptyState>No hay dosímetros con esos filtros</EmptyState>}
-              <Pagination page={page} totalPages={totalPages} onChange={setPage} />
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Detalle de dosímetros de una tarea (drill-down de la matriz) */}
-      {drill && (
-        <Modal
-          title={`Tarea ${drill.numeroTarea}${drill.portaNombre ? ` · ${drill.portaNombre}` : ''}`}
-          onClose={() => setDrill(null)}
-        >
-          {drillLoading ? (
-            <Loading />
-          ) : drillData.length === 0 ? (
-            <EmptyState>Sin dosímetros con esos filtros</EmptyState>
-          ) : (
-            <div className="overflow-x-auto">
-              <p className="text-sm text-ink/60 mb-3">{drillData.length} dosímetros</p>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-500 border-b border-slate-200">
-                    <th className="py-2 font-medium">Número</th>
-                    <th className="py-2 font-medium">Tipo</th>
-                    <th className="py-2 font-medium">Porta</th>
-                    <th className="py-2 font-medium">Bandeja/Slot</th>
-                    <th className="py-2 font-medium">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {drillData.map((d) => (
-                    <tr key={d.id} className="border-b border-slate-100">
-                      <td className="py-2 font-medium text-ink">{d.numero}</td>
-                      <td className="py-2 text-slate-600">{d.tipoDosimetroNombre}</td>
-                      <td className="py-2 text-slate-600">{d.tipoPortaNombre || <span className="text-slate-400">—</span>}</td>
-                      <td className="py-2 text-slate-600">
-                        {d.numeroBandeja != null ? `${d.numeroBandeja} / ${d.slotBandeja}` : '—'}
-                      </td>
-                      <td className="py-2">
-                        <Badge color={estadoColor[d.estado] || 'slate'}>{d.estado}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </Modal>

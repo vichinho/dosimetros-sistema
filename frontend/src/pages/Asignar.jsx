@@ -9,10 +9,13 @@ import {
   getTareasDisponibles,
   getDisponiblesPorNumero,
   importarAsignacionesExcel,
+  descargarPlantillaAsignaciones,
+  exportarAsignacionesPorIds,
 } from '../api/endpoints'
 import { Card, Button, Input, Alert, Badge, EmptyState } from '../components/ui'
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
+import { useSearchParams } from 'react-router-dom'
 
 const TRIMESTRE_REGEX = /^[1-4]T\d{4}$/
 const hoyISO = () => new Date().toISOString().slice(0, 10)
@@ -58,17 +61,69 @@ export default function Asignar() {
   // Por archivo (#12)
   const [archivo, setArchivo] = useState(null)
   const [subiendo, setSubiendo] = useState(false)
+  const [validando, setValidando] = useState(false)
   const [resultadoArchivo, setResultadoArchivo] = useState(null)
+  const [esValidacion, setEsValidacion] = useState(false)
 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [exportando, setExportando] = useState(false)
   const toast = useToast()
+
+  const exportarResumen = async (asignaciones) => {
+    setExportando(true)
+    try {
+      const blob = await exportarAsignacionesPorIds(asignaciones.map((a) => a.id))
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'asignaciones.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('No se pudo exportar')
+    } finally {
+      setExportando(false)
+    }
+  }
+
+  const descargarPlantillaArchivo = async () => {
+    try {
+      const blob = await descargarPlantillaAsignaciones()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'plantilla_asignaciones.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('No se pudo descargar la plantilla')
+    }
+  }
 
   useEffect(() => {
     getClientes().then(setClientes).catch(() => {})
     getEjecutivos().then(setEjecutivos).catch(() => {})
     getEmpresas().then(setEmpresas).catch(() => {})
     getTiposPorta().then(setPortas).catch(() => {})
+  }, [])
+
+  // Precarga desde otra pantalla: /asignar?vista=individual&numero=123
+  const [searchParams] = useSearchParams()
+  useEffect(() => {
+    const v = searchParams.get('vista')
+    const n = searchParams.get('numero')
+    if (v) setVista(v)
+    if (n) {
+      setNumero(n)
+      getDisponiblesPorNumero(Number(n))
+        .then((enc) => {
+          setCandidatos(enc)
+          if (enc.length === 1) setDosimetroSel(enc[0])
+        })
+        .catch(() => {})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Masiva: tareas con disponibles compatibles con el porta elegido.
@@ -247,7 +302,7 @@ export default function Asignar() {
         linkTrello: datos.linkTrello.trim(),
       })
       setResumenIndividual(data)
-      toast.success(`Dosímetro #${data.numeroDosimetro} asignado`)
+      toast.success(`Dosímetro ${data.numeroDosimetro} asignado`)
       // limpiar la búsqueda para asignar el siguiente
       setNumero('')
       setCandidatos(null)
@@ -261,26 +316,31 @@ export default function Asignar() {
     }
   }
 
-  const onImportarArchivo = async (e) => {
-    e.preventDefault()
+  const procesarArchivo = async (validar) => {
     setError('')
     setResultadoArchivo(null)
     if (!archivo) return setError('Selecciona un archivo .xlsx')
-    setSubiendo(true)
+    if (validar) setValidando(true)
+    else setSubiendo(true)
     try {
-      const data = await importarAsignacionesExcel(archivo)
+      const data = await importarAsignacionesExcel(archivo, validar)
       setResultadoArchivo(data)
+      setEsValidacion(validar)
       toast.success(
-        `Asignaciones: ${data.creados} creadas, ${data.actualizados} actualizadas, ${data.sinCambios} sin cambios`
+        validar
+          ? `Validación: ${data.creados} a crear, ${data.actualizados} a actualizar, ${data.fallidas} con problemas`
+          : `Asignaciones: ${data.creados} creadas, ${data.actualizados} actualizadas, ${data.sinCambios} sin cambios`
       )
     } catch (err) {
       const msg = err.response?.data?.message || 'No se pudo procesar el archivo'
       setError(msg)
       toast.error(msg)
     } finally {
+      setValidando(false)
       setSubiendo(false)
     }
   }
+  const onImportarArchivo = (e) => { e.preventDefault(); procesarArchivo(false) }
 
   const tabBtn = (k, label) => (
     <button
@@ -370,14 +430,31 @@ export default function Asignar() {
             {loading ? 'Asignando…' : 'Asignar dosímetros'}
           </Button>
 
-          {/* #10: resumen de lo asignado */}
+          {/* #10: resumen de lo asignado (sin tabla; con exportación) */}
           {resumenMasivo && (
-            <Card title="Resumen de la asignación">
-              <p className="text-sm text-ink/80 mb-3">
+            <Card
+              title="Resumen de la asignación"
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() => exportarResumen(resumenMasivo.asignaciones)}
+                  disabled={exportando || !resumenMasivo.asignaciones?.length}
+                >
+                  {exportando ? 'Exportando…' : 'Exportar a Excel'}
+                </Button>
+              }
+            >
+              <p className="text-sm text-ink/80">
                 Se asignaron <b>{resumenMasivo.cantidadAsignada}</b> de{' '}
                 {resumenMasivo.cantidadSolicitada} dosímetros solicitados.
               </p>
-              <ResumenAsignaciones asignaciones={resumenMasivo.asignaciones} />
+              {resumenMasivo.asignaciones?.[0] && (
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-ink/70 mt-3">
+                  <span>Cliente: <b className="text-ink">{resumenMasivo.asignaciones[0].clienteNombre}</b></span>
+                  <span>Trimestre: <b className="text-ink">{resumenMasivo.asignaciones[0].trimestre}</b></span>
+                  <span>Porta: <b className="text-ink">{resumenMasivo.asignaciones[0].tipoPortaNombre}</b></span>
+                </div>
+              )}
             </Card>
           )}
         </form>
@@ -421,7 +498,7 @@ export default function Asignar() {
                       checked={dosimetroSel?.id === d.id}
                       onChange={() => setDosimetroSel(d)}
                     />
-                    <span className="font-medium text-ink">#{d.numero}</span>
+                    <span className="font-medium text-ink">{d.numero}</span>
                     <span className="text-slate-500">{d.tipoDosimetroNombre}</span>
                     <span className="text-slate-500">Porta: {d.tipoPortaNombre || '—'}</span>
                     <span className="text-slate-500">Tarea: {d.numeroTarea || '—'}</span>
@@ -456,6 +533,11 @@ export default function Asignar() {
               si algún dato cambió se actualiza y si es idéntica se deja igual. Los números
               duplicados en el sistema o inexistentes se reportan como problema.
             </p>
+            <div className="mb-3">
+              <Button type="button" variant="secondary" onClick={descargarPlantillaArchivo}>
+                Descargar plantilla
+              </Button>
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <input
                 type="file"
@@ -463,16 +545,23 @@ export default function Asignar() {
                 onChange={(e) => setArchivo(e.target.files[0])}
                 className="block text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-steel file:text-white hover:file:bg-steel/90"
               />
-              <Button type="submit" disabled={subiendo}>
+              <Button type="button" variant="secondary" onClick={() => procesarArchivo(true)} disabled={validando || subiendo}>
+                {validando ? 'Validando…' : 'Validar'}
+              </Button>
+              <Button type="submit" disabled={subiendo || validando}>
                 {subiendo ? 'Procesando…' : 'Cargar asignaciones'}
               </Button>
             </div>
+            <p className="text-xs text-slate-500 mt-2">
+              <b>Validar</b> revisa el archivo (columnas y datos) sin aplicar cambios; muestra qué se
+              crearía o actualizaría y los problemas por fila. <b>Cargar</b> aplica los cambios.
+            </p>
           </Card>
 
           {error && <Alert type="error">{error}</Alert>}
 
           {resultadoArchivo && (
-            <Card title="Resultado de la carga">
+            <Card title={esValidacion ? 'Validación (sin aplicar cambios)' : 'Resultado de la carga'}>
               <div className="flex flex-wrap gap-4 text-sm mb-3">
                 <span>Total filas: <b>{resultadoArchivo.totalFilas}</b></span>
                 <span className="text-emerald-600">Creadas: <b>{resultadoArchivo.creados}</b></span>
@@ -527,7 +616,7 @@ function ResumenAsignaciones({ asignaciones }) {
           <tbody>
             {asignaciones.map((a) => (
               <tr key={a.id} className="border-b border-slate-100">
-                <td className="py-2 font-medium text-ink">#{a.numeroDosimetro}</td>
+                <td className="py-2 font-medium text-ink">{a.numeroDosimetro}</td>
                 <td className="py-2 text-slate-600">{a.tipoPortaNombre}</td>
                 <td className="py-2 text-slate-600">{a.numeroTarea || '—'}</td>
                 <td className="py-2 text-slate-600">

@@ -4,7 +4,9 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.ConteoClienteTrimestreResponse;
 import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
+import com.dosimetros.backend.dto.asignacion.EditarAsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.LoteAsignacionResponse;
 import com.dosimetros.backend.dto.asignacion.MisFiltrosResponse;
 import com.dosimetros.backend.dto.asignacion.OpcionResponse;
@@ -262,6 +264,13 @@ public class AsignacionService {
         );
     }
 
+    // Exporta a Excel un conjunto de asignaciones por sus ids (resumen de asignación).
+    public byte[] exportarPorIds(List<Integer> ids) {
+        List<AsignacionResponse> asignaciones = asignacionRepository.findAllById(ids)
+                .stream().map(this::toResponse).toList();
+        return exportarAsignacionesExcel(asignaciones);
+    }
+
     /**
      * #15: exporta una lista de asignaciones a Excel (.xlsx). Incluye la tarea.
      */
@@ -299,6 +308,14 @@ public class AsignacionService {
         return v == null ? "" : v;
     }
 
+    // #18: conteo de asignaciones por cliente y trimestre (comparación por trimestres).
+    public List<ConteoClienteTrimestreResponse> conteoPorClienteTrimestre(Integer ejecutivoId) {
+        return asignacionRepository.conteoPorClienteTrimestre(ejecutivoId).stream()
+                .map(o -> new ConteoClienteTrimestreResponse(
+                        (Integer) o[0], (String) o[1], ((Number) o[2]).longValue()))
+                .toList();
+    }
+
     // #18: asignaciones por estado de envío (enviado=false => pendientes).
     public List<AsignacionResponse> porEstadoEnvio(Integer ejecutivoId, String trimestre, boolean enviado) {
         String tri = (trimestre == null || trimestre.isBlank()) ? null : trimestre.trim();
@@ -318,6 +335,34 @@ public class AsignacionService {
         }
         asignacionRepository.saveAll(asignaciones);
         return asignaciones.size();
+    }
+
+    // #14: edita una asignación existente del historial (incluido el cliente).
+    @Transactional
+    public AsignacionResponse editarAsignacion(Integer id, EditarAsignacionRequest req) {
+        Asignacion a = asignacionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Asignación no encontrada con id: " + id));
+        Cliente cliente = clienteRepository.findById(req.getClienteId())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado con id: " + req.getClienteId()));
+        Ejecutivo ejecutivo = ejecutivoRepository.findById(req.getEjecutivoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Ejecutivo no encontrado con id: " + req.getEjecutivoId()));
+        Empresa empresa = empresaRepository.findById(req.getEmpresaId())
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa no encontrada con id: " + req.getEmpresaId()));
+        TipoPorta tipoPorta = tipoPortaRepository.findById(req.getTipoPortaId())
+                .orElseThrow(() -> new ResourceNotFoundException("Tipo de porta no encontrado con id: " + req.getTipoPortaId()));
+
+        if (!tipoPorta.getTipoDosimetro().getId().equals(a.getDosimetro().getTipoDosimetro().getId())) {
+            throw new IllegalArgumentException("El tipo de porta '" + tipoPorta.getNombre()
+                    + "' no es compatible con el dosímetro " + a.getDosimetro().getNumero());
+        }
+
+        a.setCliente(cliente);
+        a.setEjecutivo(ejecutivo);
+        a.setEmpresa(empresa);
+        a.setTipoPorta(tipoPorta);
+        a.setTrimestre(req.getTrimestre());
+        a.setLinkTrello(req.getLinkTrello());
+        return toResponse(asignacionRepository.save(a));
     }
 
     // #14 (Correcciones): busca asignaciones con filtros (admin) para corregir en lote.

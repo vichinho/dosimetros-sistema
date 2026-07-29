@@ -4,12 +4,16 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
+import com.dosimetros.backend.dto.asignacion.ConteoClienteTrimestreResponse;
 import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
+import com.dosimetros.backend.dto.asignacion.EditarAsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.ImportacionAsignacionesResponse;
 import com.dosimetros.backend.dto.asignacion.MarcarEnvioRequest;
 import com.dosimetros.backend.service.AsignacionService;
 import com.dosimetros.backend.service.ImportacionAsignacionService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -64,11 +68,35 @@ public class AsignacionController {
     }
 
     // #12: carga de asignaciones por archivo con upsert (clave = número).
+    // validar=true hace una validación en seco (no persiste, solo previsualiza).
     @PostMapping("/importacion")
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<ImportacionAsignacionesResponse> importarAsignaciones(
-            @RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(importacionService.importarExcel(file));
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false, defaultValue = "false") boolean validar) {
+        return ResponseEntity.ok(importacionService.importarExcel(file, validar));
+    }
+
+    // Plantilla .xlsx para la carga de asignaciones por archivo.
+    @GetMapping("/importacion/plantilla")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<byte[]> plantillaAsignaciones() {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"plantilla_asignaciones.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(importacionService.plantillaExcel());
+    }
+
+    // Exporta a Excel un conjunto de asignaciones por sus ids (resumen de asignación).
+    @PostMapping("/exportar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<byte[]> exportarPorIds(@RequestBody List<Integer> ids) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"asignaciones.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(service.exportarPorIds(ids));
     }
 
     // #14 (Correcciones): buscar asignaciones con filtros para corregir en lote.
@@ -83,6 +111,15 @@ public class AsignacionController {
             @RequestParam(required = false) String link) {
         return ResponseEntity.ok(
                 service.buscarAsignaciones(clienteId, ejecutivoId, empresaId, trimestre, tipoPortaId, link));
+    }
+
+    // #14: editar una asignación existente del historial (incluido el cliente).
+    @PatchMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<AsignacionResponse> editarAsignacion(
+            @PathVariable Integer id,
+            @Valid @RequestBody EditarAsignacionRequest request) {
+        return ResponseEntity.ok(service.editarAsignacion(id, request));
     }
 
     // #14 (Correcciones): corregir un mismo campo en varias asignaciones a la vez.
@@ -101,6 +138,14 @@ public class AsignacionController {
             @RequestParam(required = false) String trimestre,
             @RequestParam(required = false, defaultValue = "false") boolean enviado) {
         return ResponseEntity.ok(service.porEstadoEnvio(ejecutivoId, trimestre, enviado));
+    }
+
+    // #18: comparación por trimestres — conteo de asignaciones por cliente y trimestre.
+    @GetMapping("/resumen-cliente-trimestre")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<List<ConteoClienteTrimestreResponse>> resumenClienteTrimestre(
+            @RequestParam(required = false) Integer ejecutivoId) {
+        return ResponseEntity.ok(service.conteoPorClienteTrimestre(ejecutivoId));
     }
 
     // #18: marcar asignaciones como enviadas (o revertir).

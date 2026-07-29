@@ -12,6 +12,7 @@ import com.dosimetros.backend.repository.TipoDosimetroRepository;
 import com.dosimetros.backend.repository.TipoPortaRepository;
 import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,6 +81,9 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
         ImportacionDosimetrosResponse response = new ImportacionDosimetrosResponse();
         List<String> errores = new ArrayList<>();
+        // Guarda los saves hasta validar todo el archivo: solo se ejecutan si no
+        // hubo ningún error (todo o nada).
+        List<Runnable> acciones = new ArrayList<>();
         int exitosas = 0;
         int fallidas = 0;
         int omitidas = 0;
@@ -119,13 +123,24 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                         continue;
                     }
 
-                    dosimetroRepository.save(nuevoDosimetro(f));
+                    Dosimetro nuevo = nuevoDosimetro(f);
+                    acciones.add(() -> dosimetroRepository.save(nuevo));
                     exitosas++;
 
                 } catch (Exception e) {
                     fallidas++;
                     errores.add("Fila " + fila + ": " + e.getMessage());
                 }
+            }
+
+            // Todo o nada: solo se persiste si el archivo no tenía ningún error;
+            // en caso contrario no se guarda nada y se conserva el detalle de
+            // errores para mostrarlo al usuario.
+            if (errores.isEmpty()) {
+                acciones.forEach(Runnable::run);
+            } else {
+                response.setAplicado(false);
+                exitosas = 0;
             }
 
             response.setTotalFilas(totalFilas);
@@ -148,10 +163,15 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
         ActualizacionStockResponse response = new ActualizacionStockResponse();
         List<String> errores = new ArrayList<>();
+        List<String> alertas = new ArrayList<>();
+        // Guarda los cambios hasta validar todo el archivo: solo se ejecutan si
+        // no hubo ningún error (todo o nada).
+        List<Runnable> acciones = new ArrayList<>();
         int creados = 0;
         int actualizados = 0;
         int sinCambios = 0;
         int fallidas = 0;
+        int duplicados = 0;
         Set<Integer> numerosEnArchivo = new HashSet<>();
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
@@ -184,7 +204,8 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
                     if (existentes.isEmpty()) {
                         // No existe → se crea (upsert: insert).
-                        dosimetroRepository.save(nuevoDosimetro(f));
+                        Dosimetro nuevo = nuevoDosimetro(f);
+                        acciones.add(() -> dosimetroRepository.save(nuevo));
                         creados++;
                     } else if (existentes.size() > 1) {
                         // Número duplicado en el sistema: no se puede actualizar sin ambigüedad.
@@ -194,22 +215,52 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                     } else {
                         Dosimetro d = existentes.get(0);
                         String estado = d.getEstado();
-                        boolean bloqueado = "asignado".equalsIgnoreCase(estado)
-                                || "baja".equalsIgnoreCase(estado);
+                        boolean dadoDeBaja = "baja".equalsIgnoreCase(estado);
+                        boolean estabaAsignado = "asignado".equalsIgnoreCase(estado);
+
+                        boolean armadoEnOtraTarea = d.getTarea() != null && f.tarea() != null
+                                && !Objects.equals(d.getTarea().getId(), f.tarea().getId());
 
                         if (mismoArmado(d, f)) {
                             sinCambios++;
-                        } else if (bloqueado) {
+                        } else if (dadoDeBaja) {
+                            // Un dosímetro dado de baja no se reactiva por archivo;
+                            // requiere una acción explícita.
                             fallidas++;
-                            errores.add("Fila " + fila + ": número " + f.numero() + " está " + estado
-                                    + "; no se actualiza su armado por archivo");
+                            errores.add("Fila " + fila + ": número " + f.numero()
+                                    + " está dado de baja; no se actualiza su armado por archivo");
+                        } else if (!estabaAsignado && armadoEnOtraTarea) {
+                            // Mismo número, disponible y ya armado en OTRA tarea: es un
+                            // posible duplicado físico (dos dosímetros con el mismo
+                            // número). No se sobrescribe el existente: se carga una
+                            // copia y se avisa para resolverlo en el módulo Duplicados
+                            // (sacar uno y dejarlo de backup).
+                            Dosimetro copia = nuevoDosimetro(f);
+                            acciones.add(() -> dosimetroRepository.save(copia));
+                            duplicados++;
+                            alertas.add("Fila " + fila + ": el dosímetro " + f.numero()
+                                    + " ya existe armado en la tarea " + d.getTarea().getNumeroTarea()
+                                    + " y el archivo lo trae en la tarea " + f.tarea().getNumeroTarea()
+                                    + ". Se cargó como copia (posible duplicado). Revísalo en el módulo"
+                                    + " Duplicados para conservar solo uno.");
                         } else {
-                            d.setTipoDosimetro(f.tipoDosimetro());
-                            d.setTipoPorta(f.tipoPorta());
-                            d.setTarea(f.tarea());
-                            d.setNumeroBandeja(f.numeroBandeja());
-                            d.setSlotBandeja(f.slotBandeja());
-                            dosimetroRepository.save(d);
+                            // La mutación se difiere: solo se aplica si el archivo
+                            // completo es válido.
+                            acciones.add(() -> {
+                                d.setTipoDosimetro(f.tipoDosimetro());
+                                d.setTipoPorta(f.tipoPorta());
+                                d.setTarea(f.tarea());
+                                d.setNumeroBandeja(f.numeroBandeja());
+                                d.setSlotBandeja(f.slotBandeja());
+                                // Si venía asignado, el dosímetro volvió a la oficina
+                                // y se rearma con la nueva tarea: queda disponible para
+                                // una nueva asignación. La asignación anterior se
+                                // conserva como historial.
+                                if (estabaAsignado) {
+                                    d.setEstado("disponible");
+                                }
+                                dosimetroRepository.save(d);
+                            });
                             actualizados++;
                         }
                     }
@@ -220,12 +271,29 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                 }
             }
 
+            // Todo o nada: solo se persiste si el archivo no tenía ningún error;
+            // en caso contrario no se guarda nada y se conserva el detalle de
+            // errores para mostrarlo al usuario. Las alertas (duplicados) no
+            // bloquean, pero si el archivo se rechaza tampoco se aplicaron.
+            if (errores.isEmpty()) {
+                acciones.forEach(Runnable::run);
+            } else {
+                response.setAplicado(false);
+                creados = 0;
+                actualizados = 0;
+                sinCambios = 0;
+                duplicados = 0;
+                alertas.clear();
+            }
+
             response.setTotalFilas(totalFilas);
             response.setCreados(creados);
             response.setActualizados(actualizados);
             response.setSinCambios(sinCambios);
             response.setFallidas(fallidas);
+            response.setDuplicados(duplicados);
             response.setErrores(errores);
+            response.setAlertas(alertas);
 
         } catch (IOException e) {
             throw new RuntimeException("Error al leer el archivo Excel", e);
@@ -240,6 +308,15 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
                 "numero_tarea", "numero_bandeja", "slot_bandeja"};
         // Fila de ejemplo ficticia para guiar el llenado.
         String[] ejemplo = {"12345", "TLD", "Porta gringo", "1765", "3", "12"};
+
+        // Opciones reales del sistema para los desplegables.
+        List<String> tiposDosimetro = tipoDosimetroRepository.findAll().stream()
+                .map(TipoDosimetro::getNombre).sorted().toList();
+        List<String> tiposPorta = tipoPortaRepository.findAll().stream()
+                .map(TipoPorta::getNombre).distinct().sorted().toList();
+
+        // Última fila (0-indexada) a la que se aplica el desplegable.
+        final int ULTIMA_FILA = 1000;
 
         try (Workbook wb = new XSSFWorkbook();
              java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
@@ -263,11 +340,48 @@ public class ImportacionDosimetroServiceImpl implements ImportacionDosimetroServ
 
             for (int i = 0; i < cabeceras.length; i++) sheet.autoSizeColumn(i);
 
+            // Hoja oculta con las listas de opciones (evita el límite de 255
+            // caracteres de las listas explícitas de validación).
+            Sheet opciones = wb.createSheet("opciones");
+            for (int i = 0; i < tiposDosimetro.size(); i++) {
+                opciones.createRow(i).createCell(0).setCellValue(tiposDosimetro.get(i));
+            }
+            for (int i = 0; i < tiposPorta.size(); i++) {
+                Row r = opciones.getRow(i);
+                if (r == null) r = opciones.createRow(i);
+                r.createCell(1).setCellValue(tiposPorta.get(i));
+            }
+            wb.setSheetHidden(wb.getSheetIndex("opciones"), true);
+
+            // Desplegables (columna B = tipo_dosimetro, columna C = tipo_porta).
+            DataValidationHelper helper = sheet.getDataValidationHelper();
+            if (!tiposDosimetro.isEmpty()) {
+                agregarDesplegable(sheet, helper, 1, ULTIMA_FILA, 1,
+                        "opciones!$A$1:$A$" + tiposDosimetro.size());
+            }
+            if (!tiposPorta.isEmpty()) {
+                agregarDesplegable(sheet, helper, 1, ULTIMA_FILA, 2,
+                        "opciones!$B$1:$B$" + tiposPorta.size());
+            }
+
             wb.write(out);
             return out.toByteArray();
         } catch (IOException e) {
             throw new RuntimeException("Error al generar la plantilla", e);
         }
+    }
+
+    // Aplica una lista desplegable a un rango de una columna, referenciando una
+    // hoja de opciones (permite listas largas sin el límite de 255 caracteres).
+    private void agregarDesplegable(Sheet sheet, DataValidationHelper helper,
+                                    int primeraFila, int ultimaFila, int columna, String formula) {
+        CellRangeAddressList rango = new CellRangeAddressList(primeraFila, ultimaFila, columna, columna);
+        DataValidationConstraint constraint = helper.createFormulaListConstraint(formula);
+        DataValidation validacion = helper.createValidation(constraint, rango);
+        validacion.setSuppressDropDownArrow(true);
+        validacion.setShowErrorBox(true);
+        validacion.createErrorBox("Valor no válido", "Elige una opción de la lista.");
+        sheet.addValidationData(validacion);
     }
 
     // --- Helpers compartidos ---
