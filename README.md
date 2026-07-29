@@ -27,7 +27,6 @@
 - [Variables de entorno](#variables-de-entorno)
 - [Base de datos y migraciones](#base-de-datos-y-migraciones)
 - [Tests](#tests)
-- [Despliegue](#despliegue)
 - [Documentación](#documentación)
 
 ---
@@ -200,31 +199,9 @@ cd backend && ./mvnw test
 asignaciones, reglas de duplicados, seguridad de login) sobre **H2** — no requieren
 MySQL.
 
-## Despliegue
-
-El sistema corre cómodo en una máquina pequeña (backend + MySQL + Nginx). Opciones,
-de más simple a más control:
-
-| Opción | Cómo | Costo mensual aprox. | Puesta en marcha |
-|---|---|---|---|
-| **Railway / Render** (PaaS) | Conectas el repo; ellos compilan y despliegan. | US$ 10–25 | Horas |
-| **AWS Lightsail** (VPS) ⭐ | 1 instancia dockerizada (backend + MySQL + Nginx), precio fijo. | US$ 12–24 | 1–2 días |
-| **Hetzner / DigitalOcean** (VPS) | Igual que Lightsail, más económico. | €4–8 (Hetzner) | 1–2 días |
-
-**Anexos:** dominio (~$10–15 mil CLP/año), **HTTPS gratis** con Let's Encrypt, backup
-diario de la BD (`mysqldump`).
-
-Recursos incluidos en el repo:
-
-- Checklist de despliegue seguro: [`deploy/SEGURIDAD.md`](deploy/SEGURIDAD.md).
-- Ejemplo de Nginx (sirve el frontend y reenvía `/api`):
-  [`deploy/nginx.conf.example`](deploy/nginx.conf.example).
-
 ## Documentación
 
 - 📘 **Manual de usuario** (por módulo y por rol): [`docs/MANUAL_USUARIO.md`](docs/MANUAL_USUARIO.md).
-- 💼 **Propuesta comercial** (arriendo/SaaS + arquitectura de hosting):
-  [`docs/PROPUESTA_COMERCIAL_ARRIENDO.md`](docs/PROPUESTA_COMERCIAL_ARRIENDO.md).
 
 ---
 
