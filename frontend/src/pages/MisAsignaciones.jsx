@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getMisAsignaciones, getMisFiltros, exportarMisAsignacionesExcel } from '../api/endpoints'
-import { Card, Select, Input, Button, Loading, EmptyState, Badge } from '../components/ui'
+import { Card, Select, Input, Button, Loading, EmptyState, Badge, Pagination } from '../components/ui'
 import { useToast } from '../components/Toast'
 
-const LIMITE = 500
+const POR_PAGINA = 25
 
 const VACIO = {
   clienteId: '',
@@ -15,11 +15,22 @@ const VACIO = {
   link: '',
 }
 
+// Ordena trimestres 'QTYYYY' del más reciente al más antiguo.
+function ordenarTrimestres(lista) {
+  return [...lista].sort((a, b) => {
+    const ay = a.slice(2), by = b.slice(2)
+    if (ay !== by) return by.localeCompare(ay)
+    return b.slice(0, 1).localeCompare(a.slice(0, 1))
+  })
+}
+
 export default function MisAsignaciones() {
   const [opciones, setOpciones] = useState({ trimestres: [], clientes: [], portas: [] })
   const [filtros, setFiltros] = useState(VACIO)
   const [asignaciones, setAsignaciones] = useState([])
   const [loading, setLoading] = useState(true)
+  const [buscado, setBuscado] = useState(false)
+  const [page, setPage] = useState(1)
   const [error, setError] = useState('')
   const [exportando, setExportando] = useState(false)
   const toast = useToast()
@@ -33,6 +44,52 @@ export default function MisAsignaciones() {
     })
     return params
   }
+
+  // Para no traer TODO, se exige al menos un trimestre o un cliente.
+  const tieneFiltroMinimo = (f) => Boolean(f.trimestre || f.clienteId)
+
+  const cargar = (f = filtros) => {
+    if (!tieneFiltroMinimo(f)) {
+      setAsignaciones([])
+      setBuscado(false)
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setError('')
+    getMisAsignaciones(paramsActivos(f))
+      .then((data) => {
+        setAsignaciones(data)
+        setBuscado(true)
+        setPage(1)
+      })
+      .catch((err) =>
+        setError(
+          err.response?.status === 409
+            ? 'Tu usuario no tiene un ejecutivo asociado. Contacta a un administrador.'
+            : 'No se pudieron cargar tus asignaciones'
+        )
+      )
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    getMisFiltros()
+      .then((op) => {
+        setOpciones(op)
+        // Carga inicial acotada al trimestre más reciente (no todo el histórico).
+        const t = ordenarTrimestres(op.trimestres || [])[0]
+        if (t) {
+          const f = { ...VACIO, trimestre: t }
+          setFiltros(f)
+          cargar(f)
+        } else {
+          setLoading(false)
+        }
+      })
+      .catch(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const exportar = async () => {
     setExportando(true)
@@ -51,30 +108,6 @@ export default function MisAsignaciones() {
     }
   }
 
-  const cargar = (f = filtros) => {
-    const params = {}
-    Object.entries(f).forEach(([k, v]) => {
-      if (v !== '' && v != null) params[k] = v
-    })
-    setLoading(true)
-    getMisAsignaciones(params)
-      .then(setAsignaciones)
-      .catch((err) =>
-        setError(
-          err.response?.status === 409
-            ? 'Tu usuario no tiene un ejecutivo asociado. Contacta a un administrador.'
-            : 'No se pudieron cargar tus asignaciones'
-        )
-      )
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    getMisFiltros().then(setOpciones).catch(() => {})
-    cargar(VACIO)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   const aplicar = (e) => {
     e.preventDefault()
     cargar()
@@ -82,32 +115,37 @@ export default function MisAsignaciones() {
 
   const limpiar = () => {
     setFiltros(VACIO)
-    cargar(VACIO)
+    setAsignaciones([])
+    setBuscado(false)
   }
 
-  const visibles = asignaciones.slice(0, LIMITE)
+  const totalPages = Math.ceil(asignaciones.length / POR_PAGINA)
+  const visibles = asignaciones.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-ink">Mis asignaciones</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Filtra tus dosímetros asignados.</p>
+        <p className="text-sm text-slate-500 mt-0.5">
+          Elige un <b>trimestre</b> o un <b>cliente</b> y presiona <b>Aplicar</b>. Por defecto se
+          muestra el trimestre más reciente.
+        </p>
       </div>
 
       {error && <Badge color="red">{error}</Badge>}
 
       <Card title="Filtros">
         <form onSubmit={aplicar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Select label="Trimestre" value={filtros.trimestre} onChange={set('trimestre')}>
+            <option value="">Todos</option>
+            {ordenarTrimestres(opciones.trimestres).map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </Select>
           <Select label="Cliente" value={filtros.clienteId} onChange={set('clienteId')}>
             <option value="">Todos</option>
             {opciones.clientes.map((c) => (
               <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </Select>
-          <Select label="Trimestre" value={filtros.trimestre} onChange={set('trimestre')}>
-            <option value="">Todos</option>
-            {opciones.trimestres.map((t) => (
-              <option key={t} value={t}>{t}</option>
             ))}
           </Select>
           <Select label="Tipo de porta" value={filtros.tipoPortaId} onChange={set('tipoPortaId')}>
@@ -128,7 +166,7 @@ export default function MisAsignaciones() {
       </Card>
 
       <Card
-        title={`Resultados (${asignaciones.length}${asignaciones.length > LIMITE ? `, mostrando ${LIMITE}` : ''})`}
+        title={`Resultados (${asignaciones.length})`}
         action={
           <Button variant="secondary" onClick={exportar} disabled={exportando || asignaciones.length === 0}>
             {exportando ? 'Exportando…' : 'Exportar a Excel'}
@@ -137,6 +175,10 @@ export default function MisAsignaciones() {
       >
         {loading ? (
           <Loading />
+        ) : !tieneFiltroMinimo(filtros) && !buscado ? (
+          <EmptyState>Selecciona al menos un trimestre o un cliente y presiona Aplicar.</EmptyState>
+        ) : asignaciones.length === 0 ? (
+          <EmptyState>No hay asignaciones con esos filtros.</EmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -179,7 +221,7 @@ export default function MisAsignaciones() {
                 ))}
               </tbody>
             </table>
-            {asignaciones.length === 0 && <EmptyState>No hay asignaciones con esos filtros</EmptyState>}
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
           </div>
         )}
       </Card>
