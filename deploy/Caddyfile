@@ -1,0 +1,20 @@
+# Caddy obtiene y renueva automáticamente el certificado HTTPS (Let's Encrypt)
+# para el dominio indicado en la variable de entorno DOMAIN.
+# Requiere que los puertos 80 y 443 estén accesibles desde internet.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Las llamadas a la API van al backend (mismo origen: sin CORS).
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	# Todo lo demás es el SPA de React. try_files permite el routing del
+	# lado del cliente (recargar /stock, /armar, etc. devuelve index.html).
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
