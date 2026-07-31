@@ -225,13 +225,14 @@ def main():
     batched_insert('INSERT INTO tarea (id, numero_tarea, fecha_creacion, observacion) VALUES', vals)
     w('')
 
-    # Dosímetros (ubicación/estado actual = última fila)
-    def fila_key(f):
-        return (f['fasig'] or '0000-00-00')
-
+    # Dosímetros: la ubicación y el estado actual se toman de la ÚLTIMA fila
+    # del dosímetro en la planilla (su situación más reciente). Si esa fila no
+    # tiene cliente, el dosímetro está disponible (stock); si tiene cliente,
+    # está asignado. Se usa el orden físico de la planilla, no la fecha de
+    # asignación, porque las filas de stock (vuelta a bodega) no traen fecha.
     vals = []
     for num, rows in dosimetros.items():
-        ult = sorted(rows, key=fila_key)[-1]
+        ult = rows[-1]
         did = dosim_id[num]
         td = TD_VAR[ult['tipo']]
         pv = porta_var(ult['porta'])
