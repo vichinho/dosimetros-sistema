@@ -5,6 +5,11 @@ services:
   db:
     image: mysql:8
     restart: unless-stopped
+    # Nombres de tabla sin distinción de mayúsculas/minúsculas (igual que en
+    # desarrollo). Evita el error "missing table [asignacion]" en Linux, donde
+    # MySQL sí distingue mayúsculas por defecto. Debe fijarse en la primera
+    # inicialización de la base de datos.
+    command: ["--lower-case-table-names=1"]
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: dosimetros_db
