@@ -17,7 +17,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 FILE="$DEST/dosimetros_db-$STAMP.sql.gz"
 
 docker compose exec -T db \
-  mysqldump -udosimetros -p"$DB_PASSWORD" --single-transaction --quick dosimetros_db \
+  mysqldump -udosimetros -p"$DB_PASSWORD" --single-transaction --quick --no-tablespaces dosimetros_db \
   | gzip > "$FILE"
 
 echo "Backup creado: $FILE"
