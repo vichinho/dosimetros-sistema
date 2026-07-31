@@ -9,3 +9,7 @@ migracion/*.sql
 # Logs
 *.log
 backend/log.txt
+
+# Cache de Python
+__pycache__/
+*.pyc

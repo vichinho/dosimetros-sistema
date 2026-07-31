@@ -100,6 +100,7 @@ def main():
     dosimetros = {}      # numdosim -> dict(rows=[...])
     filas = []           # filas crudas normalizadas
     descartadas = [0]    # filas con número no numérico
+    fuera_rango = []     # números fuera del rango de la columna INT
 
     EJEC_PLACEHOLDER = 'Sin asignar'
 
@@ -119,6 +120,11 @@ def main():
         except (ValueError, TypeError):
             descartadas[0] += 1
             continue  # número no numérico (ej. 'EEEE')
+        # La columna 'numero' es INT: descartar valores fuera de rango
+        # (normalmente celdas con un código erróneo o demasiado largo).
+        if num < 1 or num > 2147483647:
+            fuera_rango.append(num)
+            continue
         porta_raw = sstr(row[C_PORTA]).upper()
         cat_nombre, tipo = PORTA_MAP.get(porta_raw, PORTA_DEFAULT)
         # Trimestre debe ser texto tipo '2T2025'; descartar valores no válidos.
@@ -285,6 +291,10 @@ def main():
     print(f'  Dosímetros: {len(dosimetros)}')
     print(f'  Asignaciones: {n_asig}')
     print(f'  Filas descartadas (número no numérico): {descartadas[0]}')
+    print(f'  Filas descartadas (número fuera de rango): {len(fuera_rango)}')
+    if fuera_rango:
+        ejemplos = ', '.join(str(x) for x in sorted(set(fuera_rango))[:10])
+        print(f'    Números fuera de rango (ejemplos): {ejemplos}')
 
 
 if __name__ == '__main__':
