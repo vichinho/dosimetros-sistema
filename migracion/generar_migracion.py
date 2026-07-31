@@ -231,16 +231,22 @@ def main():
         pv = porta_var(ult['porta'])
         tarea_id = tareas.get(ult['tarea']) if ult['tarea'] else None
         estado = 'asignado' if ult['cli'] else 'disponible'
+        # fecha_creacion (NOT NULL): fecha de asignación más antigua del
+        # dosímetro como aproximación a su ingreso; si no tiene, la fecha de su
+        # tarea; y si tampoco, la fecha actual.
+        fechas = [rr['fasig'] for rr in rows if rr['fasig']]
+        fcrea = min(fechas) if fechas else tarea_fecha.get(ult['tarea'])
+        fcrea_sql = esc(fcrea) if fcrea else 'CURDATE()'
         vals.append(
             f"({did}, {num}, {td}, {pv}, "
             f"{tarea_id if tarea_id else 'NULL'}, "
             f"{ult['band'] if ult['band'] is not None else 'NULL'}, "
             f"{ult['slot'] if ult['slot'] is not None else 'NULL'}, "
-            f"'{estado}', NULL)"
+            f"'{estado}', NULL, {fcrea_sql})"
         )
     batched_insert(
         'INSERT INTO dosimetro (id, numero, tipo_dosimetro_id, tipo_porta_id, '
-        'tarea_id, numero_bandeja, slot_bandeja, estado, observacion) VALUES', vals)
+        'tarea_id, numero_bandeja, slot_bandeja, estado, observacion, fecha_creacion) VALUES', vals)
     w('')
 
     # Asignaciones (solo filas con cliente)
