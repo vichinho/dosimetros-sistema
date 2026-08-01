@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { getMisAsignaciones, getMisFiltros } from '../api/endpoints'
-import { Card, Select, Alert, Loading, EmptyState } from '../components/ui'
+import { Card, Select, Input, Button, Alert, Loading, EmptyState, Pagination } from '../components/ui'
+import { useToast } from '../components/Toast'
+
+const POR_PAGINA = 25
+
+const VACIO = { clienteId: '', trimestre: '', fecha: '' }
 
 // Ordena trimestres 'QTYYYY' del más reciente al más antiguo.
 function ordenarTrimestres(lista) {
@@ -11,36 +16,70 @@ function ordenarTrimestres(lista) {
   })
 }
 
-// Agrupa las asignaciones por trimestre + fecha de asignación (lotes).
-function agruparLotes(asignaciones) {
-  const map = new Map()
-  for (const a of asignaciones) {
-    const clave = `${a.trimestre}|${a.fechaAsignacion}`
-    if (!map.has(clave)) {
-      map.set(clave, { trimestre: a.trimestre, fechaAsignacion: a.fechaAsignacion, asignaciones: [] })
-    }
-    map.get(clave).asignaciones.push(a)
-  }
-  return [...map.values()].map((l) => ({ ...l, cantidad: l.asignaciones.length }))
+// Orden solicitado: fecha de asignación, tarea, bandeja, slot.
+function comparar(a, b) {
+  const fa = a.fechaAsignacion || ''
+  const fb = b.fechaAsignacion || ''
+  if (fa !== fb) return fa.localeCompare(fb)
+  const ta = Number(a.numeroTarea) || 0
+  const tb = Number(b.numeroTarea) || 0
+  if (ta !== tb) return ta - tb
+  const ba = a.numeroBandeja ?? -1
+  const bb = b.numeroBandeja ?? -1
+  if (ba !== bb) return ba - bb
+  return (a.slotBandeja ?? -1) - (b.slotBandeja ?? -1)
 }
 
 export default function MisDosimetros() {
-  const [trimestres, setTrimestres] = useState([])
-  const [trimestre, setTrimestre] = useState('')
-  const [lotes, setLotes] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [opciones, setOpciones] = useState({ trimestres: [], clientes: [], portas: [] })
+  const [filtros, setFiltros] = useState(VACIO)
+  const [asignaciones, setAsignaciones] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [buscado, setBuscado] = useState(false)
+  const [page, setPage] = useState(1)
   const [error, setError] = useState('')
+  const [exportando, setExportando] = useState(false)
+  const toast = useToast()
 
-  const cargar = (t) => {
-    if (!t) {
-      setLotes([])
-      setLoading(false)
+  const set = (campo) => (e) => setFiltros({ ...filtros, [campo]: e.target.value })
+
+  // Se exige al menos un filtro: no hay vista general.
+  const tieneFiltro = (f) => Boolean(f.clienteId || f.trimestre || f.fecha)
+
+  const paramsActivos = (f = filtros) => {
+    const params = {}
+    Object.entries(f).forEach(([k, v]) => {
+      if (v !== '' && v != null) params[k] = v
+    })
+    return params
+  }
+
+  useEffect(() => {
+    getMisFiltros()
+      .then(setOpciones)
+      .catch((err) =>
+        setError(
+          err.response?.status === 409
+            ? 'Tu usuario no tiene un ejecutivo asociado. Contacta a un administrador.'
+            : 'No se pudieron cargar los filtros'
+        )
+      )
+  }, [])
+
+  const cargar = (f = filtros) => {
+    if (!tieneFiltro(f)) {
+      setAsignaciones([])
+      setBuscado(false)
       return
     }
     setLoading(true)
     setError('')
-    getMisAsignaciones({ trimestre: t })
-      .then((asigs) => setLotes(agruparLotes(asigs)))
+    getMisAsignaciones(paramsActivos(f))
+      .then((data) => {
+        setAsignaciones([...data].sort(comparar))
+        setBuscado(true)
+        setPage(1)
+      })
       .catch((err) =>
         setError(
           err.response?.status === 409
@@ -51,102 +90,151 @@ export default function MisDosimetros() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    getMisFiltros()
-      .then((op) => {
-        const ts = ordenarTrimestres(op.trimestres || [])
-        setTrimestres(ts)
-        // Carga inicial acotada al trimestre más reciente (no todo el histórico).
-        if (ts[0]) {
-          setTrimestre(ts[0])
-          cargar(ts[0])
-        } else {
-          setLoading(false)
-        }
-      })
-      .catch((err) => {
-        setError(
-          err.response?.status === 409
-            ? 'Tu usuario no tiene un ejecutivo asociado. Contacta a un administrador.'
-            : 'No se pudieron cargar tus dosímetros'
-        )
-        setLoading(false)
-      })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const onTrimestre = (e) => {
-    const t = e.target.value
-    setTrimestre(t)
-    cargar(t)
+  const aplicar = (e) => {
+    e.preventDefault()
+    if (!tieneFiltro(filtros)) {
+      toast.error('Aplica al menos un filtro (cliente, trimestre o fecha).')
+      return
+    }
+    cargar()
   }
+
+  const limpiar = () => {
+    setFiltros(VACIO)
+    setAsignaciones([])
+    setBuscado(false)
+  }
+
+  // Exporta las asignaciones filtradas, ya ordenadas por fecha, tarea, bandeja y slot.
+  const exportar = () => {
+    if (!asignaciones.length) {
+      toast.error('No hay datos para exportar.')
+      return
+    }
+    setExportando(true)
+    try {
+      const sep = ';'
+      const esc = (v) => {
+        const s = String(v ?? '')
+        return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+      }
+      const enc = ['N° dosímetro', 'Cliente', 'Empresa', 'Trimestre', 'Fecha asignación',
+        'Tipo porta', 'Tarea', 'Bandeja', 'Slot', 'Trello']
+      const filas = asignaciones.map((a) => [
+        a.numeroDosimetro, a.clienteNombre, a.empresaNombre, a.trimestre, a.fechaAsignacion,
+        a.tipoPortaNombre, a.numeroTarea || '', a.numeroBandeja ?? '', a.slotBandeja ?? '',
+        a.linkTrello || '',
+      ])
+      const csv = '﻿' + [enc, ...filas].map((r) => r.map(esc).join(sep)).join('\r\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `mis-dosimetros_${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`Exportados ${asignaciones.length} dosímetros`)
+    } finally {
+      setExportando(false)
+    }
+  }
+
+  const totalPages = Math.ceil(asignaciones.length / POR_PAGINA)
+  const visibles = asignaciones.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-ink">Mis dosímetros (lotes enviados)</h1>
+        <h1 className="text-2xl font-bold text-ink">Mis dosímetros</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Agrupados por fecha de asignación. Elige un <b>trimestre</b> para ver sus lotes.
+          Aplica al menos un filtro (<b>cliente</b>, <b>trimestre</b> o <b>fecha</b>) para ver tus dosímetros.
         </p>
       </div>
 
       {error && <Alert type="error">{error}</Alert>}
 
-      <Card title="Trimestre">
-        <div className="max-w-xs">
-          <Select label="Trimestre" value={trimestre} onChange={onTrimestre}>
-            <option value="">Selecciona…</option>
-            {trimestres.map((t) => (
+      <Card title="Filtros">
+        <form onSubmit={aplicar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Select label="Cliente" value={filtros.clienteId} onChange={set('clienteId')}>
+            <option value="">Todos</option>
+            {opciones.clientes.map((c) => (
+              <option key={c.id} value={c.id}>{c.nombre}</option>
+            ))}
+          </Select>
+          <Select label="Trimestre" value={filtros.trimestre} onChange={set('trimestre')}>
+            <option value="">Todos</option>
+            {ordenarTrimestres(opciones.trimestres).map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </Select>
-        </div>
+          <Input label="Fecha de asignación" type="date" value={filtros.fecha} onChange={set('fecha')} />
+          <div className="flex items-end gap-2">
+            <Button type="submit">Aplicar</Button>
+            <Button type="button" variant="secondary" onClick={limpiar}>Limpiar</Button>
+          </div>
+        </form>
       </Card>
 
-      {loading ? (
-        <Loading />
-      ) : !trimestre ? (
-        <Card><EmptyState>Selecciona un trimestre para ver tus lotes.</EmptyState></Card>
-      ) : lotes.length === 0 ? (
-        <Card><EmptyState>No tienes dosímetros asignados en {trimestre}.</EmptyState></Card>
-      ) : (
-        lotes.map((lote, i) => (
-          <Card key={i} title={`${lote.trimestre} — ${lote.fechaAsignacion} (${lote.cantidad} dosímetros)`}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-500 border-b border-slate-200">
-                    <th className="py-2">N° dosímetro</th>
-                    <th className="py-2">Cliente</th>
-                    <th className="py-2">Empresa</th>
-                    <th className="py-2">Porta</th>
-                    <th className="py-2">Trello</th>
+      <Card
+        title={`Dosímetros (${asignaciones.length})`}
+        action={
+          <Button variant="secondary" onClick={exportar} disabled={exportando || asignaciones.length === 0}>
+            {exportando ? 'Exportando…' : 'Exportar'}
+          </Button>
+        }
+      >
+        {loading ? (
+          <Loading />
+        ) : !buscado ? (
+          <EmptyState>Aplica al menos un filtro y presiona Aplicar para ver tus dosímetros.</EmptyState>
+        ) : asignaciones.length === 0 ? (
+          <EmptyState>No hay dosímetros con esos filtros.</EmptyState>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  <th className="py-2 font-medium">N° dosímetro</th>
+                  <th className="py-2 font-medium">Cliente</th>
+                  <th className="py-2 font-medium">Empresa</th>
+                  <th className="py-2 font-medium">Trimestre</th>
+                  <th className="py-2 font-medium">Fecha asig.</th>
+                  <th className="py-2 font-medium">Porta</th>
+                  <th className="py-2 font-medium">Tarea</th>
+                  <th className="py-2 font-medium">Bandeja/Slot</th>
+                  <th className="py-2 font-medium">Trello</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibles.map((a) => (
+                  <tr key={a.id} className="border-b border-slate-100">
+                    <td className="py-2.5 font-medium text-ink">{a.numeroDosimetro}</td>
+                    <td className="py-2.5 text-slate-600">{a.clienteNombre}</td>
+                    <td className="py-2.5 text-slate-600">{a.empresaNombre}</td>
+                    <td className="py-2.5 text-slate-600">{a.trimestre}</td>
+                    <td className="py-2.5 text-slate-600">{a.fechaAsignacion}</td>
+                    <td className="py-2.5 text-slate-600">{a.tipoPortaNombre}</td>
+                    <td className="py-2.5 text-slate-600">{a.numeroTarea || '—'}</td>
+                    <td className="py-2.5 text-slate-600">
+                      {a.numeroBandeja != null ? `${a.numeroBandeja} / ${a.slotBandeja}` : '—'}
+                    </td>
+                    <td className="py-2.5">
+                      {a.linkTrello ? (
+                        <a href={a.linkTrello} target="_blank" rel="noreferrer" className="text-steel hover:underline">
+                          Ver
+                        </a>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {lote.asignaciones.map((a) => (
-                    <tr key={a.id} className="border-b border-slate-100">
-                      <td className="py-2 font-medium text-ink">{a.numeroDosimetro}</td>
-                      <td className="py-2">{a.clienteNombre}</td>
-                      <td className="py-2">{a.empresaNombre}</td>
-                      <td className="py-2">{a.tipoPortaNombre}</td>
-                      <td className="py-2">
-                        {a.linkTrello ? (
-                          <a href={a.linkTrello} target="_blank" rel="noreferrer" className="text-steel hover:underline">
-                            Ver
-                          </a>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        ))
-      )}
+                ))}
+              </tbody>
+            </table>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          </div>
+        )}
+      </Card>
     </div>
   )
 }
