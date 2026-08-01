@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getMisAsignaciones, getMisFiltros } from '../api/endpoints'
 import { Card, Select, Input, Button, Alert, Loading, EmptyState, Pagination } from '../components/ui'
 import Combobox from '../components/Combobox'
@@ -106,39 +106,56 @@ export default function MisDosimetros() {
     setBuscado(false)
   }
 
-  // Exporta las asignaciones filtradas, ya ordenadas por fecha, tarea, bandeja y slot.
-  const exportar = () => {
-    if (!asignaciones.length) {
+  // Exporta una lista de asignaciones a CSV (orden fecha/tarea/bandeja/slot).
+  const exportarLista = (items, sufijo) => {
+    if (!items.length) {
       toast.error('No hay datos para exportar.')
       return
     }
+    const sep = ';'
+    const esc = (v) => {
+      const s = String(v ?? '')
+      return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+    }
+    const enc = ['N° dosímetro', 'Cliente', 'Empresa', 'Trimestre', 'Fecha asignación',
+      'Tipo porta', 'Tarea', 'Bandeja', 'Slot', 'Trello']
+    const filas = items.map((a) => [
+      a.numeroDosimetro, a.clienteNombre, a.empresaNombre, a.trimestre, a.fechaAsignacion,
+      a.tipoPortaNombre, a.numeroTarea || '', a.numeroBandeja ?? '', a.slotBandeja ?? '',
+      a.linkTrello || '',
+    ])
+    const csv = '﻿' + [enc, ...filas].map((r) => r.map(esc).join(sep)).join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mis-dosimetros_${sufijo}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exportados ${items.length} dosímetros`)
+  }
+
+  const exportarTodos = () => {
     setExportando(true)
     try {
-      const sep = ';'
-      const esc = (v) => {
-        const s = String(v ?? '')
-        return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
-      }
-      const enc = ['N° dosímetro', 'Cliente', 'Empresa', 'Trimestre', 'Fecha asignación',
-        'Tipo porta', 'Tarea', 'Bandeja', 'Slot', 'Trello']
-      const filas = asignaciones.map((a) => [
-        a.numeroDosimetro, a.clienteNombre, a.empresaNombre, a.trimestre, a.fechaAsignacion,
-        a.tipoPortaNombre, a.numeroTarea || '', a.numeroBandeja ?? '', a.slotBandeja ?? '',
-        a.linkTrello || '',
-      ])
-      const csv = '﻿' + [enc, ...filas].map((r) => r.map(esc).join(sep)).join('\r\n')
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `mis-dosimetros_${new Date().toISOString().slice(0, 10)}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
-      toast.success(`Exportados ${asignaciones.length} dosímetros`)
+      exportarLista(asignaciones, `todos_${new Date().toISOString().slice(0, 10)}`)
     } finally {
       setExportando(false)
     }
   }
+
+  // Grupos de asignación por fecha (cada fecha = un "lote"), con su cantidad.
+  const grupos = useMemo(() => {
+    const map = new Map()
+    for (const a of asignaciones) {
+      const f = a.fechaAsignacion || 'Sin fecha'
+      if (!map.has(f)) map.set(f, [])
+      map.get(f).push(a)
+    }
+    return [...map.entries()]
+      .map(([fecha, items]) => ({ fecha, items, cantidad: items.length }))
+      .sort((x, y) => x.fecha.localeCompare(y.fecha))
+  }, [asignaciones])
 
   const totalPages = Math.ceil(asignaciones.length / POR_PAGINA)
   const visibles = asignaciones.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
@@ -178,11 +195,44 @@ export default function MisDosimetros() {
         </form>
       </Card>
 
+      {buscado && asignaciones.length > 0 && (
+        <Card
+          title={`Grupos de asignación por fecha (${grupos.length})`}
+          action={
+            <Button variant="secondary" onClick={exportarTodos} disabled={exportando}>
+              {exportando ? 'Exportando…' : 'Descargar todos'}
+            </Button>
+          }
+        >
+          <p className="text-sm text-slate-500 mb-3">
+            {asignaciones.length} dosímetros en {grupos.length} grupo(s) por fecha. Descarga un
+            grupo puntual o todos juntos.
+          </p>
+          <div className="divide-y divide-mist/60">
+            {grupos.map((g) => (
+              <div key={g.fecha} className="flex items-center justify-between py-2.5">
+                <div className="text-sm">
+                  <span className="font-medium text-ink">{g.fecha}</span>
+                  <span className="text-slate-500"> · {g.cantidad} dosímetros</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => exportarLista(g.items, `${g.fecha}`)}
+                  className="text-sm text-steel hover:underline"
+                >
+                  Descargar grupo ↓
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card
         title={`Dosímetros (${asignaciones.length})`}
         action={
-          <Button variant="secondary" onClick={exportar} disabled={exportando || asignaciones.length === 0}>
-            {exportando ? 'Exportando…' : 'Exportar'}
+          <Button variant="secondary" onClick={exportarTodos} disabled={exportando || asignaciones.length === 0}>
+            {exportando ? 'Exportando…' : 'Exportar todos'}
           </Button>
         }
       >
