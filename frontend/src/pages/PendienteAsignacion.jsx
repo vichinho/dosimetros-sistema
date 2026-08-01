@@ -87,24 +87,40 @@ export default function PendienteAsignacion() {
     return next
   })
 
-  // Filas: clientes filtrados por búsqueda y (opcional) solo pendientes en la 1ª columna.
+  // Trimestre "base" de comparación = el más antiguo de los seleccionados;
+  // el "actual" = el más reciente. Solo se compara cuando el usuario elige
+  // trimestres (si no elige, se muestran todos los clientes).
+  const comparando = trimestresSel.size >= 1
+  const base = comparando && columnas.length ? columnas[columnas.length - 1] : null
+  const colActual = columnas.length ? columnas[0] : null
+
+  // Filas: al comparar, solo los clientes que tuvieron asignación en el
+  // trimestre base (para contrastar el período anterior con el actual),
+  // ordenados por cantidad de mayor a menor.
   const filas = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     let lista = clientes
     if (q) lista = lista.filter((c) => c.razonSocial.toLowerCase().includes(q))
-    if (soloPendientes && columnas.length > 0) {
-      const col = columnas[0]
-      lista = lista.filter((c) => !(porCliente.get(c.id)?.[col] > 0))
+    // Excluye a los clientes que no tuvieron asignación en el trimestre base.
+    if (base) lista = lista.filter((c) => (porCliente.get(c.id)?.[base] || 0) > 0)
+    // Opcional: solo los que hoy están pendientes en el trimestre actual.
+    if (soloPendientes && colActual) {
+      lista = lista.filter((c) => !((porCliente.get(c.id)?.[colActual] || 0) > 0))
     }
-    return lista
-  }, [clientes, busqueda, soloPendientes, columnas, porCliente])
+    // Orden por cantidad del trimestre base (o el actual si no hay base), desc.
+    const ref = base || colActual
+    return [...lista].sort((a, b) => {
+      const ca = ref ? (porCliente.get(a.id)?.[ref] || 0) : 0
+      const cb = ref ? (porCliente.get(b.id)?.[ref] || 0) : 0
+      if (cb !== ca) return cb - ca
+      return a.razonSocial.localeCompare(b.razonSocial)
+    })
+  }, [clientes, busqueda, soloPendientes, base, colActual, porCliente])
 
   useEffect(() => { setPage(1) }, [busqueda, soloPendientes, trimestresSel, ejecutivoId])
 
   const totalPages = Math.ceil(filas.length / POR_PAGINA)
   const visibles = filas.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
-
-  const colLabel = columnas.length ? columnas[0] : null
 
   // Exporta la tabla tal como se ve, respetando los filtros seleccionados
   // (búsqueda, ejecutivo, trimestres a comparar y "solo pendientes"). Se
@@ -146,8 +162,9 @@ export default function PendienteAsignacion() {
       <div>
         <h1 className="text-2xl font-bold text-ink">Pendiente de asignación</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Comparación por trimestre: cuántos dosímetros tiene cada cliente en cada período.
-          Donde no hay asignación, el cliente está <b>pendiente</b>.
+          Selecciona los <b>trimestres a comparar</b>. Se muestran solo los clientes que tuvieron
+          asignación en el <b>trimestre base</b> (el más antiguo elegido), ordenados por cantidad
+          (de mayor a menor). Donde no hay asignación en el período, el cliente está <b>pendiente</b>.
         </p>
       </div>
 
@@ -184,10 +201,10 @@ export default function PendienteAsignacion() {
               </div>
             )}
           </div>
-          {colLabel && (
+          {base && colActual && base !== colActual && (
             <label className="flex items-center gap-2 text-sm text-ink/70">
               <input type="checkbox" checked={soloPendientes} onChange={(e) => setSoloPendientes(e.target.checked)} />
-              Mostrar solo clientes pendientes en <b>{colLabel}</b>
+              Mostrar solo los <b>pendientes</b> en {colActual} (tenían en {base} y aún no en {colActual})
             </label>
           )}
         </div>
@@ -218,7 +235,9 @@ export default function PendienteAsignacion() {
                 <tr className="text-left text-slate-500 border-b border-slate-200">
                   <th className="py-2 font-medium sticky left-0 bg-white">Cliente</th>
                   {columnas.map((t) => (
-                    <th key={t} className="py-2 px-3 font-medium text-center whitespace-nowrap">{t}</th>
+                    <th key={t} className="py-2 px-3 font-medium text-center whitespace-nowrap">
+                      {t}{t === base ? ' (base)' : ''}
+                    </th>
                   ))}
                 </tr>
               </thead>
