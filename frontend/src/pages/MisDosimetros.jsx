@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getMisAsignaciones, getMisFiltros } from '../api/endpoints'
 import { Card, Select, Input, Button, Alert, Loading, EmptyState, Pagination } from '../components/ui'
+import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 
 const POR_PAGINA = 25
@@ -155,12 +156,14 @@ export default function MisDosimetros() {
 
       <Card title="Filtros">
         <form onSubmit={aplicar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Select label="Cliente" value={filtros.clienteId} onChange={set('clienteId')}>
-            <option value="">Todos</option>
-            {opciones.clientes.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </Select>
+          <Combobox
+            label="Cliente"
+            options={opciones.clientes.map((c) => ({ value: c.id, label: c.nombre }))}
+            value={filtros.clienteId}
+            onChange={(v) => setFiltros((f) => ({ ...f, clienteId: v }))}
+            placeholder="Escribe para buscar…"
+          />
+
           <Select label="Trimestre" value={filtros.trimestre} onChange={set('trimestre')}>
             <option value="">Todos</option>
             {ordenarTrimestres(opciones.trimestres).map((t) => (
