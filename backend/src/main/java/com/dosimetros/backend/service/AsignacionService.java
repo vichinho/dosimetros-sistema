@@ -5,6 +5,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
 import com.dosimetros.backend.dto.asignacion.ConteoClienteTrimestreResponse;
+import com.dosimetros.backend.dto.asignacion.CorreccionExcelResponse;
 import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.EditarAsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.LoteAsignacionResponse;
@@ -23,12 +24,15 @@ import com.dosimetros.backend.repository.DosimetroRepository;
 import com.dosimetros.backend.repository.EjecutivoRepository;
 import com.dosimetros.backend.repository.EmpresaRepository;
 import com.dosimetros.backend.repository.TipoPortaRepository;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,6 +41,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class AsignacionService {
@@ -271,6 +276,153 @@ public class AsignacionService {
         return exportarAsignacionesExcel(asignaciones);
     }
 
+    // #14 (Correcciones por Excel): exporta las asignaciones indicadas con el
+    // id como clave, para editarlas en Excel y volver a subirlas.
+    public byte[] exportarParaCorreccion(List<Integer> ids) {
+        List<Asignacion> asignaciones = asignacionRepository.findAllById(ids);
+        try (Workbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("Correcciones");
+            String[] cab = {"id_asignacion", "numero_dosimetro", "cliente", "ejecutivo", "empresa",
+                    "tipo_porta", "trimestre", "numero_bandeja", "slot_bandeja", "link_trello"};
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < cab.length; i++) header.createCell(i).setCellValue(cab[i]);
+            int r = 1;
+            for (Asignacion a : asignaciones) {
+                Row row = sheet.createRow(r++);
+                row.createCell(0).setCellValue(a.getId());
+                if (a.getDosimetro() != null && a.getDosimetro().getNumero() != null) {
+                    row.createCell(1).setCellValue(a.getDosimetro().getNumero());
+                }
+                row.createCell(2).setCellValue(nvl(a.getCliente() != null ? a.getCliente().getRazonSocial() : ""));
+                row.createCell(3).setCellValue(nvl(a.getEjecutivo() != null ? a.getEjecutivo().getNombre() : ""));
+                row.createCell(4).setCellValue(nvl(a.getEmpresa() != null ? a.getEmpresa().getNombre() : ""));
+                row.createCell(5).setCellValue(nvl(a.getTipoPorta() != null ? a.getTipoPorta().getNombre() : ""));
+                row.createCell(6).setCellValue(nvl(a.getTrimestre()));
+                if (a.getNumeroBandeja() != null) row.createCell(7).setCellValue(a.getNumeroBandeja());
+                if (a.getSlotBandeja() != null) row.createCell(8).setCellValue(a.getSlotBandeja());
+                row.createCell(9).setCellValue(nvl(a.getLinkTrello()));
+            }
+            for (int i = 0; i < cab.length; i++) sheet.autoSizeColumn(i);
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Error al generar el Excel de correcciones", e);
+        }
+    }
+
+    // #14 (Correcciones por Excel): aplica las ediciones de un Excel descargado.
+    // Clave = id_asignacion. Todo o nada: si hay cualquier error, no se guarda nada.
+    @Transactional
+    public CorreccionExcelResponse importarCorreccion(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("El archivo está vacío");
+        }
+        CorreccionExcelResponse resp = new CorreccionExcelResponse();
+        List<String> errores = new ArrayList<>();
+        List<Runnable> acciones = new ArrayList<>();
+        int actualizadas = 0, sinCambios = 0, fallidas = 0, total = 0;
+
+        try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = wb.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue; // encabezado
+                String idStr = celda(row, 0, fmt);
+                // Fila vacía: sin id ni datos.
+                if (idStr.isBlank() && celda(row, 2, fmt).isBlank() && celda(row, 9, fmt).isBlank()) continue;
+                total++;
+                int fila = row.getRowNum() + 1;
+                try {
+                    if (idStr.isBlank()) throw new IllegalArgumentException("falta el id_asignacion");
+                    int id;
+                    try { id = (int) Double.parseDouble(idStr); }
+                    catch (Exception e) { throw new IllegalArgumentException("id_asignacion inválido: '" + idStr + "'"); }
+                    Asignacion a = asignacionRepository.findById(id)
+                            .orElseThrow(() -> new IllegalArgumentException("no existe la asignación id " + idStr));
+
+                    String cliNom = celda(row, 2, fmt);
+                    String ejeNom = celda(row, 3, fmt);
+                    String empNom = celda(row, 4, fmt);
+                    String portaNom = celda(row, 5, fmt);
+                    String tri = celda(row, 6, fmt).toUpperCase();
+                    String bandaStr = celda(row, 7, fmt);
+                    String slotStr = celda(row, 8, fmt);
+                    String link = celda(row, 9, fmt);
+
+                    final Cliente cli = unico(clienteRepository.findByRazonSocialIgnoreCaseAndActivoTrue(cliNom), "cliente", cliNom);
+                    final Ejecutivo eje = unico(ejecutivoRepository.findByNombreIgnoreCaseAndActivoTrue(ejeNom), "ejecutivo", ejeNom);
+                    final Empresa emp = unico(empresaRepository.findByNombreIgnoreCaseAndActivaTrue(empNom), "empresa", empNom);
+                    final TipoPorta porta = tipoPortaRepository
+                            .findByNombreAndTipoDosimetroId(portaNom, a.getDosimetro().getTipoDosimetro().getId())
+                            .orElseThrow(() -> new IllegalArgumentException(
+                                    "tipo de porta '" + portaNom + "' no válido para el dosímetro #" + a.getDosimetro().getNumero()));
+                    if (!tri.matches("[1-4]T\\d{4}")) throw new IllegalArgumentException("trimestre inválido: '" + tri + "'");
+                    final Integer banda = bandaStr.isBlank() ? null : (int) Double.parseDouble(bandaStr);
+                    final Integer slot = slotStr.isBlank() ? null : (int) Double.parseDouble(slotStr);
+                    if (link.isBlank()) throw new IllegalArgumentException("el link de Trello no puede quedar vacío");
+
+                    boolean cambia = !cli.getId().equals(a.getCliente().getId())
+                            || !eje.getId().equals(a.getEjecutivo().getId())
+                            || !emp.getId().equals(a.getEmpresa().getId())
+                            || !porta.getId().equals(a.getTipoPorta().getId())
+                            || !tri.equals(a.getTrimestre())
+                            || !Objects.equals(banda, a.getNumeroBandeja())
+                            || !Objects.equals(slot, a.getSlotBandeja())
+                            || !link.trim().equals(a.getLinkTrello());
+
+                    if (!cambia) {
+                        sinCambios++;
+                        continue;
+                    }
+                    final String linkFinal = link.trim();
+                    acciones.add(() -> {
+                        a.setCliente(cli);
+                        a.setEjecutivo(eje);
+                        a.setEmpresa(emp);
+                        a.setTipoPorta(porta);
+                        a.setTrimestre(tri);
+                        a.setNumeroBandeja(banda);
+                        a.setSlotBandeja(slot);
+                        a.setLinkTrello(linkFinal);
+                        asignacionRepository.save(a);
+                    });
+                    actualizadas++;
+                } catch (Exception e) {
+                    fallidas++;
+                    errores.add("Fila " + fila + ": " + e.getMessage());
+                }
+            }
+
+            // Todo o nada: solo se persiste si no hubo errores.
+            if (errores.isEmpty()) {
+                acciones.forEach(Runnable::run);
+            } else {
+                resp.setAplicado(false);
+                actualizadas = 0;
+                sinCambios = 0;
+            }
+            resp.setTotalFilas(total);
+            resp.setActualizadas(actualizadas);
+            resp.setSinCambios(sinCambios);
+            resp.setFallidas(fallidas);
+            resp.setErrores(errores);
+        } catch (IOException e) {
+            throw new RuntimeException("Error al leer el archivo Excel", e);
+        }
+        return resp;
+    }
+
+    private String celda(Row row, int col, DataFormatter fmt) {
+        Cell c = row.getCell(col);
+        return c == null ? "" : fmt.formatCellValue(c).trim();
+    }
+
+    private <T> T unico(List<T> encontrados, String campo, String valor) {
+        if (encontrados.isEmpty()) throw new IllegalArgumentException(campo + " no encontrado: '" + valor + "'");
+        if (encontrados.size() > 1) throw new IllegalArgumentException(campo + " ambiguo (hay varios): '" + valor + "'");
+        return encontrados.get(0);
+    }
+
     /**
      * #15: exporta una lista de asignaciones a Excel (.xlsx). Incluye la tarea.
      */
@@ -407,6 +559,19 @@ public class AsignacionService {
                     .orElseThrow(() -> new ResourceNotFoundException("Empresa no encontrada con id: " + valor));
             case "tipoPortaId" -> tipoPorta = tipoPortaRepository.findById(Integer.valueOf(valor))
                     .orElseThrow(() -> new ResourceNotFoundException("Tipo de porta no encontrado con id: " + valor));
+            case "trimestre" -> {
+                if (valor == null || !valor.trim().toUpperCase().matches("[1-4]T\\d{4}")) {
+                    throw new IllegalArgumentException("El trimestre debe tener el formato 1T2026, 2T2026, etc.");
+                }
+            }
+            case "numeroBandeja", "slotBandeja" -> {
+                try { Integer.parseInt(valor.trim()); }
+                catch (Exception e) { throw new IllegalArgumentException("El valor debe ser un número entero"); }
+            }
+            case "fechaAsignacion" -> {
+                try { LocalDate.parse(valor.trim()); }
+                catch (Exception e) { throw new IllegalArgumentException("La fecha debe tener formato AAAA-MM-DD"); }
+            }
             default -> throw new IllegalArgumentException("Campo no permitido para corrección: " + campo);
         }
 
@@ -425,6 +590,10 @@ public class AsignacionService {
                     }
                     a.setTipoPorta(tipoPorta);
                 }
+                case "trimestre" -> a.setTrimestre(valor.trim().toUpperCase());
+                case "numeroBandeja" -> a.setNumeroBandeja(Integer.parseInt(valor.trim()));
+                case "slotBandeja" -> a.setSlotBandeja(Integer.parseInt(valor.trim()));
+                case "fechaAsignacion" -> a.setFechaAsignacion(LocalDate.parse(valor.trim()));
             }
         }
         asignacionRepository.saveAll(asignaciones);

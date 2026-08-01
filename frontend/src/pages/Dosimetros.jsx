@@ -15,8 +15,10 @@ import {
   buscarAsignaciones,
   correccionMasivaAsignaciones,
   editarAsignacion,
+  exportarCorreccionExcel,
+  importarCorreccionExcel,
 } from '../api/endpoints'
-import { Card, Button, Input, Select, Badge, Alert, Loading, EmptyState, Modal } from '../components/ui'
+import { Card, Button, Input, Select, Badge, Alert, Loading, EmptyState, Modal, Pagination } from '../components/ui'
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 import { useNavigate } from 'react-router-dom'
@@ -384,15 +386,35 @@ function ModalEditar({ dosimetro, tiposDosimetro, portas, onClose, onGuardado, t
 // ---------------------------------------------------------------------------
 // Vista 2: Correcciones masivas de asignaciones
 // ---------------------------------------------------------------------------
+const POR_PAGINA_CORR = 25
+
+const CAMPOS = [
+  { value: 'linkTrello', label: 'Link de Trello' },
+  { value: 'clienteId', label: 'Cliente' },
+  { value: 'ejecutivoId', label: 'Ejecutivo' },
+  { value: 'empresaId', label: 'Empresa' },
+  { value: 'tipoPortaId', label: 'Tipo de porta' },
+  { value: 'trimestre', label: 'Trimestre' },
+  { value: 'numeroBandeja', label: 'N° de bandeja' },
+  { value: 'slotBandeja', label: 'Slot de bandeja' },
+  { value: 'fechaAsignacion', label: 'Fecha de asignación' },
+]
+
 function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
   const [filtros, setFiltros] = useState({ clienteId: '', ejecutivoId: '', empresaId: '', trimestre: '', link: '' })
   const [resultados, setResultados] = useState(null)
   const [seleccion, setSeleccion] = useState(() => new Set())
   const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
   const [campo, setCampo] = useState('linkTrello')
   const [valor, setValor] = useState('')
   const [aplicando, setAplicando] = useState(false)
   const [error, setError] = useState('')
+  // Round-trip por Excel
+  const [descargando, setDescargando] = useState(false)
+  const [archivo, setArchivo] = useState(null)
+  const [subiendo, setSubiendo] = useState(false)
+  const [resultadoImport, setResultadoImport] = useState(null)
 
   const buscar = async (e) => {
     e?.preventDefault()
@@ -408,6 +430,7 @@ function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
       if (filtros.link) params.link = filtros.link
       const data = await buscarAsignaciones(params)
       setResultados(data)
+      setPage(1)
     } catch {
       toast.error('No se pudieron buscar las asignaciones')
     } finally {
@@ -432,12 +455,13 @@ function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
     empresaId: empresas.map((e) => ({ value: e.id, label: e.nombre })),
     tipoPortaId: portas.map((p) => ({ value: p.id, label: p.nombre })),
   }
-  const esTexto = campo === 'linkTrello'
+  const esCombo = Boolean(opcionesValor[campo])
+  const labelCampo = CAMPOS.find((c) => c.value === campo)?.label || 'valor'
 
   const aplicar = async () => {
     setError('')
     if (seleccion.size === 0) return setError('Selecciona al menos una asignación')
-    if (!valor) return setError('Indica el nuevo valor')
+    if (!valor && valor !== 0) return setError('Indica el nuevo valor')
     setAplicando(true)
     try {
       const n = await correccionMasivaAsignaciones({
@@ -456,6 +480,47 @@ function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
       setAplicando(false)
     }
   }
+
+  const descargarExcel = async () => {
+    if (!resultados?.length) return
+    setDescargando(true)
+    try {
+      const blob = await exportarCorreccionExcel(resultados.map((a) => a.id))
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'correcciones_asignaciones.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('No se pudo descargar el Excel')
+    } finally {
+      setDescargando(false)
+    }
+  }
+
+  const subirExcel = async () => {
+    if (!archivo) return toast.error('Selecciona el archivo .xlsx editado')
+    setSubiendo(true)
+    setResultadoImport(null)
+    try {
+      const data = await importarCorreccionExcel(archivo)
+      setResultadoImport(data)
+      if (data.aplicado === false) {
+        toast.error('El archivo tiene errores. No se guardó ningún cambio; corrígelos y vuelve a subirlo.')
+      } else {
+        toast.success(`${data.actualizadas} asignaciones actualizadas, ${data.sinCambios} sin cambios`)
+        buscar()
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo procesar el archivo')
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
+  const totalPages = resultados ? Math.ceil(resultados.length / POR_PAGINA_CORR) : 0
+  const visibles = resultados ? resultados.slice((page - 1) * POR_PAGINA_CORR, page * POR_PAGINA_CORR) : []
 
   return (
     <div className="space-y-6">
@@ -491,23 +556,27 @@ function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
 
       {resultados && (
         <>
-          {/* Barra de corrección */}
+          {/* Barra de corrección rápida (mismo valor a las seleccionadas) */}
           <Card title="Corregir seleccionadas">
             <div className="flex flex-wrap items-end gap-3">
               <div className="w-52">
                 <Select label="Campo a corregir" value={campo} onChange={(e) => { setCampo(e.target.value); setValor('') }}>
-                  <option value="linkTrello">Link de Trello</option>
-                  <option value="clienteId">Cliente</option>
-                  <option value="ejecutivoId">Ejecutivo</option>
-                  <option value="empresaId">Empresa</option>
-                  <option value="tipoPortaId">Tipo de porta</option>
+                  {CAMPOS.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
                 </Select>
               </div>
               <div className="w-64">
-                {esTexto ? (
-                  <Input label="Nuevo link de Trello" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="https://trello.com/c/…" />
+                {esCombo ? (
+                  <Combobox label={`Nuevo ${labelCampo}`} options={opcionesValor[campo]} value={valor} onChange={setValor} />
+                ) : campo === 'numeroBandeja' || campo === 'slotBandeja' ? (
+                  <Input label={`Nuevo ${labelCampo}`} type="number" value={valor} onChange={(e) => setValor(e.target.value)} />
+                ) : campo === 'fechaAsignacion' ? (
+                  <Input label="Nueva fecha" type="date" value={valor} onChange={(e) => setValor(e.target.value)} />
+                ) : campo === 'trimestre' ? (
+                  <Input label="Nuevo trimestre" placeholder="Ej: 2T2026" value={valor} onChange={(e) => setValor(e.target.value)} />
                 ) : (
-                  <Combobox label="Nuevo valor" options={opcionesValor[campo]} value={valor} onChange={setValor} />
+                  <Input label="Nuevo link de Trello" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="https://trello.com/c/…" />
                 )}
               </div>
               <Button onClick={aplicar} disabled={aplicando || seleccion.size === 0}>
@@ -515,6 +584,51 @@ function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
               </Button>
             </div>
             {error && <div className="mt-3"><Alert type="error">{error}</Alert></div>}
+          </Card>
+
+          {/* Edición por Excel (descargar, editar y volver a subir) */}
+          <Card title="Editar por Excel">
+            <p className="text-sm text-slate-500 mb-3">
+              Descarga las asignaciones encontradas, edítalas en Excel (no cambies la columna
+              <b> id_asignacion</b>) y vuelve a subir el archivo para aplicar los cambios. Si hay
+              cualquier error, no se guarda nada.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="secondary" onClick={descargarExcel} disabled={descargando || !resultados.length}>
+                {descargando ? 'Descargando…' : `Descargar Excel (${resultados.length})`}
+              </Button>
+              <input
+                type="file"
+                accept=".xlsx"
+                onChange={(e) => setArchivo(e.target.files[0])}
+                className="block text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-steel file:text-white hover:file:bg-steel/90"
+              />
+              <Button type="button" onClick={subirExcel} disabled={subiendo}>
+                {subiendo ? 'Aplicando…' : 'Aplicar Excel editado'}
+              </Button>
+            </div>
+            {resultadoImport && (
+              <div className="mt-4">
+                {resultadoImport.aplicado === false && (
+                  <Alert type="error">
+                    El archivo contiene errores, por lo que <b>no se guardó ningún cambio</b>. Corrígelos y vuelve a subirlo.
+                  </Alert>
+                )}
+                <div className="flex flex-wrap gap-4 text-sm my-3">
+                  <span>Total filas: <b>{resultadoImport.totalFilas}</b></span>
+                  <span className="text-steel">Actualizadas: <b>{resultadoImport.actualizadas}</b></span>
+                  <span className="text-ink/60">Sin cambios: <b>{resultadoImport.sinCambios}</b></span>
+                  <span className="text-red-600">Con problemas: <b>{resultadoImport.fallidas}</b></span>
+                </div>
+                {resultadoImport.errores?.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-60 overflow-auto">
+                    <ul className="text-sm text-red-700 space-y-1">
+                      {resultadoImport.errores.map((msg, i) => (<li key={i}>{msg}</li>))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </Card>
 
           <Card title={`Asignaciones encontradas (${resultados.length})`}>
@@ -538,7 +652,7 @@ function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {resultados.map((a) => (
+                    {visibles.map((a) => (
                       <tr key={a.id} className={`border-b border-slate-100 ${seleccion.has(a.id) ? 'bg-steel/5' : ''}`}>
                         <td className="py-2"><input type="checkbox" checked={seleccion.has(a.id)} onChange={() => toggle(a.id)} /></td>
                         <td className="py-2 font-medium text-ink">{a.numeroDosimetro}</td>
@@ -554,6 +668,10 @@ function Correcciones({ clientes, ejecutivos, empresas, portas, toast }) {
                     ))}
                   </tbody>
                 </table>
+                <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+                <p className="text-xs text-slate-400 mt-2">
+                  La selección para "Corregir seleccionadas" se mantiene entre páginas.
+                </p>
               </div>
             )}
           </Card>
