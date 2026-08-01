@@ -28,7 +28,6 @@ const NAV_ITEMS = [
   { to: '/importar', label: 'Importar Excel', icon: IconUpload, roles: ['ADMIN'] },
   { to: '/usuarios-ejecutivos', label: 'Usuarios y ejecutivos', icon: IconUser, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/mis-dosimetros', label: 'Mis dosímetros', icon: IconBox, roles: ['EJECUTIVO'] },
-  { to: '/mis-asignaciones', label: 'Mis asignaciones', icon: IconAssign, roles: ['EJECUTIVO'] },
   { to: '/mis-clientes', label: 'Mis clientes', icon: IconClients, roles: ['EJECUTIVO'] },
 ]
 

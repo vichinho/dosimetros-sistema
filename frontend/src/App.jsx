@@ -14,7 +14,6 @@ import TiposPorta from './pages/TiposPorta'
 import Importar from './pages/Importar'
 import UsuariosEjecutivos from './pages/UsuariosEjecutivos'
 import MisDosimetros from './pages/MisDosimetros'
-import MisAsignaciones from './pages/MisAsignaciones'
 import MisClientes from './pages/MisClientes'
 import PendienteAsignacion from './pages/PendienteAsignacion'
 
@@ -64,10 +63,8 @@ export default function App() {
           path="/mis-dosimetros"
           element={<ProtectedRoute roles={['EJECUTIVO']}><MisDosimetros /></ProtectedRoute>}
         />
-        <Route
-          path="/mis-asignaciones"
-          element={<ProtectedRoute roles={['EJECUTIVO']}><MisAsignaciones /></ProtectedRoute>}
-        />
+        {/* "Mis asignaciones" se fusionó en "Mis dosímetros" */}
+        <Route path="/mis-asignaciones" element={<Navigate to="/mis-dosimetros" replace />} />
         <Route
           path="/mis-clientes"
           element={<ProtectedRoute roles={['EJECUTIVO']}><MisClientes /></ProtectedRoute>}
