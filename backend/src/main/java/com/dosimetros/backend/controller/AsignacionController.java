@@ -5,6 +5,7 @@ import com.dosimetros.backend.dto.asignacion.AsignacionMasivaResponse;
 import com.dosimetros.backend.dto.asignacion.AsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.AsignacionResponse;
 import com.dosimetros.backend.dto.asignacion.ConteoClienteTrimestreResponse;
+import com.dosimetros.backend.dto.asignacion.CorreccionExcelResponse;
 import com.dosimetros.backend.dto.asignacion.CorreccionMasivaRequest;
 import com.dosimetros.backend.dto.asignacion.EditarAsignacionRequest;
 import com.dosimetros.backend.dto.asignacion.ImportacionAsignacionesResponse;
@@ -127,6 +128,24 @@ public class AsignacionController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
     public ResponseEntity<Integer> correccionMasiva(@Valid @RequestBody CorreccionMasivaRequest request) {
         return ResponseEntity.ok(service.correccionMasiva(request));
+    }
+
+    // #14 (Correcciones por Excel): descargar las asignaciones a un Excel editable.
+    @PostMapping("/correcciones/exportar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<byte[]> exportarCorreccion(@RequestBody List<Integer> ids) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"correcciones_asignaciones.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(service.exportarParaCorreccion(ids));
+    }
+
+    // #14 (Correcciones por Excel): aplicar el Excel editado (clave = id_asignacion).
+    @PostMapping("/correcciones/importar")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERADOR')")
+    public ResponseEntity<CorreccionExcelResponse> importarCorreccion(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(service.importarCorreccion(file));
     }
 
     // #18: asignaciones por estado de envío (admin/operador, con filtro de ejecutivo).

@@ -120,6 +120,13 @@ export const getMisResumenClienteTrimestre = () =>
   client.get('/ejecutivo/resumen-cliente-trimestre').then((r) => r.data)
 export const correccionMasivaAsignaciones = (data) =>
   client.patch('/asignaciones/correccion-masiva', data).then((r) => r.data)
+export const exportarCorreccionExcel = (ids) =>
+  client.post('/asignaciones/correcciones/exportar', ids, { responseType: 'blob' }).then((r) => r.data)
+export const importarCorreccionExcel = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return client.post('/asignaciones/correcciones/importar', formData).then((r) => r.data)
+}
 export const editarAsignacion = (id, data) =>
   client.patch(`/asignaciones/${id}`, data).then((r) => r.data)
 export const getDisponiblesPorNumero = (numero) =>
