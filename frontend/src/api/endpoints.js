@@ -153,3 +153,13 @@ export const exportarMisAsignacionesExcel = (params) =>
     .get('/ejecutivo/mis-asignaciones/export', { params, responseType: 'blob' })
     .then((r) => r.data)
 export const getMisLotes = () => client.get('/ejecutivo/mis-lotes').then((r) => r.data)
+
+// --- Comparador de dosimetría (ejecutivo) ---
+export const compararDosimetria = (softwareFile, clientFile) => {
+  const fd = new FormData()
+  fd.append('softwareFile', softwareFile)
+  fd.append('clientFile', clientFile)
+  return client.post('/ejecutivo/comparador', fd, { responseType: 'blob' }).then((r) => r.data)
+}
+export const descargarPlantillaComparador = () =>
+  client.get('/ejecutivo/comparador/plantilla', { responseType: 'blob' }).then((r) => r.data)

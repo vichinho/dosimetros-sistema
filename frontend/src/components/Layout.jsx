@@ -29,6 +29,7 @@ const NAV_ITEMS = [
   { to: '/usuarios-ejecutivos', label: 'Usuarios y ejecutivos', icon: IconUser, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/mis-dosimetros', label: 'Mis dosímetros', icon: IconBox, roles: ['EJECUTIVO'] },
   { to: '/mis-clientes', label: 'Mis clientes', icon: IconClients, roles: ['EJECUTIVO'] },
+  { to: '/comparador', label: 'Comparador', icon: IconCopy, roles: ['EJECUTIVO'] },
 ]
 
 export default function Layout() {
