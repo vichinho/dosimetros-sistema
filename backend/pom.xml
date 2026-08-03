@@ -48,6 +48,13 @@
             <version>5.5.1</version>
         </dependency>
 
+        <!-- Comparador de dosimetría: matching difuso de nombres -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-text</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>

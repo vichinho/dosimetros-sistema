@@ -15,6 +15,7 @@ import Importar from './pages/Importar'
 import UsuariosEjecutivos from './pages/UsuariosEjecutivos'
 import MisDosimetros from './pages/MisDosimetros'
 import MisClientes from './pages/MisClientes'
+import Comparador from './pages/Comparador'
 import PendienteAsignacion from './pages/PendienteAsignacion'
 
 // Redirige a la pantalla inicial según el rol.
@@ -68,6 +69,10 @@ export default function App() {
         <Route
           path="/mis-clientes"
           element={<ProtectedRoute roles={['EJECUTIVO']}><MisClientes /></ProtectedRoute>}
+        />
+        <Route
+          path="/comparador"
+          element={<ProtectedRoute roles={['EJECUTIVO']}><Comparador /></ProtectedRoute>}
         />
       </Route>
 
