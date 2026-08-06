@@ -107,15 +107,13 @@ export default function PendienteAsignacion() {
     if (soloPendientes && colActual) {
       lista = lista.filter((c) => !((porCliente.get(c.id)?.[colActual] || 0) > 0))
     }
-    // Orden: al comparar, por cantidad del trimestre base; si no, por el TOTAL
-    // de asignaciones del cliente (todos los trimestres), de mayor a menor.
-    const valor = (c) => {
-      const m = porCliente.get(c.id) || {}
-      return base ? (m[base] || 0) : Object.values(m).reduce((s, n) => s + (n || 0), 0)
-    }
+    // Orden por cantidad del trimestre base (o el actual si no hay base), desc.
+    const ref = base || colActual
     return [...lista].sort((a, b) => {
-      const diff = valor(b) - valor(a)
-      return diff !== 0 ? diff : a.razonSocial.localeCompare(b.razonSocial)
+      const ca = ref ? (porCliente.get(a.id)?.[ref] || 0) : 0
+      const cb = ref ? (porCliente.get(b.id)?.[ref] || 0) : 0
+      if (cb !== ca) return cb - ca
+      return a.razonSocial.localeCompare(b.razonSocial)
     })
   }, [clientes, busqueda, soloPendientes, base, colActual, porCliente])
 
@@ -123,13 +121,6 @@ export default function PendienteAsignacion() {
 
   const totalPages = Math.ceil(filas.length / POR_PAGINA)
   const visibles = filas.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
-
-  // Total de asignaciones de un cliente sumando TODOS sus trimestres
-  // (no solo los mostrados como columnas).
-  const totalCliente = (id) => {
-    const m = porCliente.get(id) || {}
-    return Object.values(m).reduce((s, n) => s + (n || 0), 0)
-  }
 
   // Exporta la tabla tal como se ve, respetando los filtros seleccionados
   // (búsqueda, ejecutivo, trimestres a comparar y "solo pendientes"). Se
@@ -144,13 +135,13 @@ export default function PendienteAsignacion() {
       const s = String(v ?? '')
       return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
     }
-    const encabezados = ['Cliente', ...columnas, 'Total']
+    const encabezados = ['Cliente', ...columnas]
     const lineas = filas.map((c) => {
       const conteo = porCliente.get(c.id) || {}
       const celdas = [c.razonSocial, ...columnas.map((t) => {
         const n = conteo[t] || 0
         return n > 0 ? n : 'Pendiente'
-      }), totalCliente(c.id)]
+      })]
       return celdas.map(esc).join(sep)
     })
     const csv = '﻿' + [encabezados.map(esc).join(sep), ...lineas].join('\r\n')
@@ -248,9 +239,6 @@ export default function PendienteAsignacion() {
                       {t}{t === base ? ' (base)' : ''}
                     </th>
                   ))}
-                  <th className="py-2 px-3 font-medium text-center whitespace-nowrap border-l border-slate-200">
-                    Total
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -271,9 +259,6 @@ export default function PendienteAsignacion() {
                           </td>
                         )
                       })}
-                      <td className="py-2 px-3 text-center font-bold text-steel border-l border-slate-100">
-                        {totalCliente(c.id)}
-                      </td>
                     </tr>
                   )
                 })}

@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getMisAsignaciones, getMisFiltros } from '../api/endpoints'
-import { Card, Select, Input, Button, Alert, Loading, EmptyState, Pagination } from '../components/ui'
+import { useAuth } from '../auth/AuthContext'
+import { getMisAsignaciones, getMisClientes, getClientes, buscarAsignaciones } from '../api/endpoints'
+import { Card, Input, Button, Alert, Loading, EmptyState, Pagination } from '../components/ui'
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 
 const POR_PAGINA = 25
-
-const VACIO = { clienteId: '', trimestre: '', fecha: '' }
 
 // Ordena trimestres 'QTYYYY' del más reciente al más antiguo.
 function ordenarTrimestres(lista) {
@@ -31,80 +30,94 @@ function comparar(a, b) {
   return (a.slotBandeja ?? -1) - (b.slotBandeja ?? -1)
 }
 
+// Agrupa las asignaciones por fecha de asignación (lotes).
+function agruparLotes(asignaciones) {
+  const map = new Map()
+  for (const a of asignaciones) {
+    const f = a.fechaAsignacion || 'Sin fecha'
+    if (!map.has(f)) map.set(f, [])
+    map.get(f).push(a)
+  }
+  return [...map.entries()].map(([fecha, items]) => ({ fecha, items, cantidad: items.length }))
+}
+
 export default function MisDosimetros() {
-  const [opciones, setOpciones] = useState({ trimestres: [], clientes: [], portas: [] })
-  const [filtros, setFiltros] = useState(VACIO)
+  const { rol } = useAuth()
+  const esEjecutivo = rol === 'EJECUTIVO'
+  const toast = useToast()
+
+  const [clientes, setClientes] = useState([])
+  const [clienteId, setClienteId] = useState('')
   const [asignaciones, setAsignaciones] = useState([])
+  const [trimestresSel, setTrimestresSel] = useState(() => new Set())
+  const [fecha, setFecha] = useState('')
   const [loading, setLoading] = useState(false)
   const [buscado, setBuscado] = useState(false)
   const [page, setPage] = useState(1)
-  const [error, setError] = useState('')
   const [exportando, setExportando] = useState(false)
-  const toast = useToast()
+  const [error, setError] = useState('')
 
-  const set = (campo) => (e) => setFiltros({ ...filtros, [campo]: e.target.value })
-
-  // Se exige al menos un filtro: no hay vista general.
-  const tieneFiltro = (f) => Boolean(f.clienteId || f.trimestre || f.fecha)
-
-  const paramsActivos = (f = filtros) => {
-    const params = {}
-    Object.entries(f).forEach(([k, v]) => {
-      if (v !== '' && v != null) params[k] = v
-    })
-    return params
-  }
-
+  // Carga la lista de clientes para el buscador (según el rol).
   useEffect(() => {
-    getMisFiltros()
-      .then(setOpciones)
+    const p = esEjecutivo ? getMisClientes() : getClientes()
+    p.then((cs) => setClientes(cs.map((c) => ({ value: c.id, label: c.razonSocial }))))
       .catch((err) =>
         setError(
           err.response?.status === 409
             ? 'Tu usuario no tiene un ejecutivo asociado. Contacta a un administrador.'
-            : 'No se pudieron cargar los filtros'
+            : 'No se pudieron cargar los clientes'
         )
       )
-  }, [])
+  }, [esEjecutivo])
 
-  const cargar = (f = filtros) => {
-    if (!tieneFiltro(f)) {
+  // Al elegir un cliente se cargan TODAS sus asignaciones (todos los trimestres).
+  const elegirCliente = (id) => {
+    setClienteId(id)
+    setTrimestresSel(new Set())
+    setFecha('')
+    if (!id) {
       setAsignaciones([])
       setBuscado(false)
       return
     }
     setLoading(true)
     setError('')
-    getMisAsignaciones(paramsActivos(f))
-      .then((data) => {
-        setAsignaciones([...data].sort(comparar))
-        setBuscado(true)
-        setPage(1)
-      })
-      .catch((err) =>
-        setError(
-          err.response?.status === 409
-            ? 'Tu usuario no tiene un ejecutivo asociado. Contacta a un administrador.'
-            : 'No se pudieron cargar tus dosímetros'
-        )
-      )
+    const p = esEjecutivo ? getMisAsignaciones({ clienteId: id }) : buscarAsignaciones({ clienteId: id })
+    p.then((data) => {
+      setAsignaciones([...data].sort(comparar))
+      setBuscado(true)
+      setPage(1)
+    })
+      .catch(() => setError('No se pudieron cargar las asignaciones'))
       .finally(() => setLoading(false))
   }
 
-  const aplicar = (e) => {
-    e.preventDefault()
-    if (!tieneFiltro(filtros)) {
-      toast.error('Aplica al menos un filtro (cliente, trimestre o fecha).')
-      return
-    }
-    cargar()
-  }
+  // Trimestres presentes en las asignaciones del cliente (para los chips).
+  const trimestresDisp = useMemo(
+    () => ordenarTrimestres([...new Set(asignaciones.map((a) => a.trimestre))]),
+    [asignaciones]
+  )
 
-  const limpiar = () => {
-    setFiltros(VACIO)
-    setAsignaciones([])
-    setBuscado(false)
-  }
+  const toggleTrimestre = (t) => setTrimestresSel((prev) => {
+    const next = new Set(prev)
+    if (next.has(t)) next.delete(t); else next.add(t)
+    return next
+  })
+
+  // Filtra por los trimestres seleccionados (o todos) y por fecha.
+  const filtradas = useMemo(() => {
+    return asignaciones.filter((a) => {
+      if (trimestresSel.size > 0 && !trimestresSel.has(a.trimestre)) return false
+      if (fecha && a.fechaAsignacion !== fecha) return false
+      return true
+    })
+  }, [asignaciones, trimestresSel, fecha])
+
+  useEffect(() => { setPage(1) }, [trimestresSel, fecha])
+
+  const grupos = useMemo(() => agruparLotes(filtradas), [filtradas])
+  const totalPages = Math.ceil(filtradas.length / POR_PAGINA)
+  const visibles = filtradas.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
 
   // Exporta una lista de asignaciones a CSV (orden fecha/tarea/bandeja/slot).
   const exportarLista = (items, sufijo) => {
@@ -129,7 +142,7 @@ export default function MisDosimetros() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `mis-dosimetros_${sufijo}.csv`
+    a.download = `asignaciones_${sufijo}.csv`
     a.click()
     URL.revokeObjectURL(url)
     toast.success(`Exportados ${items.length} dosímetros`)
@@ -138,156 +151,156 @@ export default function MisDosimetros() {
   const exportarTodos = () => {
     setExportando(true)
     try {
-      exportarLista(asignaciones, `todos_${new Date().toISOString().slice(0, 10)}`)
+      exportarLista(filtradas, `${new Date().toISOString().slice(0, 10)}`)
     } finally {
       setExportando(false)
     }
   }
 
-  // Grupos de asignación por fecha (cada fecha = un "lote"), con su cantidad.
-  const grupos = useMemo(() => {
-    const map = new Map()
-    for (const a of asignaciones) {
-      const f = a.fechaAsignacion || 'Sin fecha'
-      if (!map.has(f)) map.set(f, [])
-      map.get(f).push(a)
-    }
-    return [...map.entries()]
-      .map(([fecha, items]) => ({ fecha, items, cantidad: items.length }))
-      .sort((x, y) => x.fecha.localeCompare(y.fecha))
-  }, [asignaciones])
-
-  const totalPages = Math.ceil(asignaciones.length / POR_PAGINA)
-  const visibles = asignaciones.slice((page - 1) * POR_PAGINA, page * POR_PAGINA)
-
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-ink">Mis dosímetros</h1>
+        <h1 className="text-2xl font-bold text-ink">
+          {esEjecutivo ? 'Mis dosímetros' : 'Asignaciones por cliente'}
+        </h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Aplica al menos un filtro (<b>cliente</b>, <b>trimestre</b> o <b>fecha</b>) para ver tus dosímetros.
+          Elige un <b>cliente</b> para ver sus asignaciones. Luego selecciona uno o varios
+          <b> trimestres</b> (y/o una fecha) para filtrar y descargar.
         </p>
       </div>
 
       {error && <Alert type="error">{error}</Alert>}
 
-      <Card title="Filtros">
-        <form onSubmit={aplicar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card title="Cliente">
+        <div className="max-w-md">
           <Combobox
             label="Cliente"
-            options={opciones.clientes.map((c) => ({ value: c.id, label: c.nombre }))}
-            value={filtros.clienteId}
-            onChange={(v) => setFiltros((f) => ({ ...f, clienteId: v }))}
+            options={clientes}
+            value={clienteId}
+            onChange={elegirCliente}
             placeholder="Escribe para buscar…"
           />
-
-          <Select label="Trimestre" value={filtros.trimestre} onChange={set('trimestre')}>
-            <option value="">Todos</option>
-            {ordenarTrimestres(opciones.trimestres).map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </Select>
-          <Input label="Fecha de asignación" type="date" value={filtros.fecha} onChange={set('fecha')} />
-          <div className="flex items-end gap-2">
-            <Button type="submit">Aplicar</Button>
-            <Button type="button" variant="secondary" onClick={limpiar}>Limpiar</Button>
-          </div>
-        </form>
+        </div>
       </Card>
 
-      {buscado && asignaciones.length > 0 && (
-        <Card
-          title={`Grupos de asignación por fecha (${grupos.length})`}
-          action={
-            <Button variant="secondary" onClick={exportarTodos} disabled={exportando}>
-              {exportando ? 'Exportando…' : 'Descargar todos'}
-            </Button>
-          }
-        >
-          <p className="text-sm text-slate-500 mb-3">
-            {asignaciones.length} dosímetros en {grupos.length} grupo(s) por fecha. Descarga un
-            grupo puntual o todos juntos.
-          </p>
-          <div className="divide-y divide-mist/60">
-            {grupos.map((g) => (
-              <div key={g.fecha} className="flex items-center justify-between py-2.5">
-                <div className="text-sm">
-                  <span className="font-medium text-ink">{g.fecha}</span>
-                  <span className="text-slate-500"> · {g.cantidad} dosímetros</span>
+      {loading ? (
+        <Loading />
+      ) : !buscado ? (
+        <Card><EmptyState>Selecciona un cliente para ver sus asignaciones.</EmptyState></Card>
+      ) : asignaciones.length === 0 ? (
+        <Card><EmptyState>Este cliente no tiene asignaciones.</EmptyState></Card>
+      ) : (
+        <>
+          <Card title="Filtrar por trimestre y fecha">
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">Trimestres</p>
+                  <span className="text-xs text-ink/40">
+                    {trimestresSel.size === 0 ? 'Todos' : `${trimestresSel.size} seleccionados`}
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => exportarLista(g.items, `${g.fecha}`)}
-                  className="text-sm text-steel hover:underline"
-                >
-                  Descargar grupo ↓
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {trimestresDisp.map((t) => (
+                    <button key={t} type="button" onClick={() => toggleTrimestre(t)}
+                      className={`px-3 py-1 rounded-full border text-sm transition ${
+                        trimestresSel.has(t) ? 'bg-steel text-white border-steel' : 'bg-white text-ink/70 border-mist hover:border-steel/50'
+                      }`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        </Card>
-      )}
+              <div className="max-w-xs">
+                <Input label="Fecha de asignación (opcional)" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              </div>
+            </div>
+          </Card>
 
-      <Card
-        title={`Dosímetros (${asignaciones.length})`}
-        action={
-          <Button variant="secondary" onClick={exportarTodos} disabled={exportando || asignaciones.length === 0}>
-            {exportando ? 'Exportando…' : 'Exportar todos'}
-          </Button>
-        }
-      >
-        {loading ? (
-          <Loading />
-        ) : !buscado ? (
-          <EmptyState>Aplica al menos un filtro y presiona Aplicar para ver tus dosímetros.</EmptyState>
-        ) : asignaciones.length === 0 ? (
-          <EmptyState>No hay dosímetros con esos filtros.</EmptyState>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500 border-b border-slate-200">
-                  <th className="py-2 font-medium">N° dosímetro</th>
-                  <th className="py-2 font-medium">Cliente</th>
-                  <th className="py-2 font-medium">Empresa</th>
-                  <th className="py-2 font-medium">Trimestre</th>
-                  <th className="py-2 font-medium">Fecha asig.</th>
-                  <th className="py-2 font-medium">Porta</th>
-                  <th className="py-2 font-medium">Tarea</th>
-                  <th className="py-2 font-medium">Bandeja/Slot</th>
-                  <th className="py-2 font-medium">Trello</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibles.map((a) => (
-                  <tr key={a.id} className="border-b border-slate-100">
-                    <td className="py-2.5 font-medium text-ink">{a.numeroDosimetro}</td>
-                    <td className="py-2.5 text-slate-600">{a.clienteNombre}</td>
-                    <td className="py-2.5 text-slate-600">{a.empresaNombre}</td>
-                    <td className="py-2.5 text-slate-600">{a.trimestre}</td>
-                    <td className="py-2.5 text-slate-600">{a.fechaAsignacion}</td>
-                    <td className="py-2.5 text-slate-600">{a.tipoPortaNombre}</td>
-                    <td className="py-2.5 text-slate-600">{a.numeroTarea || '—'}</td>
-                    <td className="py-2.5 text-slate-600">
-                      {a.numeroBandeja != null ? `${a.numeroBandeja} / ${a.slotBandeja}` : '—'}
-                    </td>
-                    <td className="py-2.5">
-                      {a.linkTrello ? (
-                        <a href={a.linkTrello} target="_blank" rel="noreferrer" className="text-steel hover:underline">
-                          Ver
-                        </a>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
-          </div>
-        )}
-      </Card>
+          <Card
+            title={`Grupos de asignación por fecha (${grupos.length})`}
+            action={
+              <Button variant="secondary" onClick={exportarTodos} disabled={exportando || filtradas.length === 0}>
+                {exportando ? 'Exportando…' : 'Descargar todos'}
+              </Button>
+            }
+          >
+            {filtradas.length === 0 ? (
+              <EmptyState>No hay asignaciones con esos filtros.</EmptyState>
+            ) : (
+              <>
+                <p className="text-sm text-slate-500 mb-3">
+                  {filtradas.length} dosímetros en {grupos.length} grupo(s) por fecha. Descarga un
+                  grupo puntual o todos juntos.
+                </p>
+                <div className="divide-y divide-mist/60">
+                  {grupos.map((g) => (
+                    <div key={g.fecha} className="flex items-center justify-between py-2.5">
+                      <div className="text-sm">
+                        <span className="font-medium text-ink">{g.fecha}</span>
+                        <span className="text-slate-500"> · {g.cantidad} dosímetros</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => exportarLista(g.items, `${g.fecha}`)}
+                        className="text-sm text-steel hover:underline"
+                      >
+                        Descargar grupo ↓
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </Card>
+
+          <Card title={`Dosímetros (${filtradas.length})`}>
+            {filtradas.length === 0 ? (
+              <EmptyState>No hay asignaciones con esos filtros.</EmptyState>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-slate-500 border-b border-slate-200">
+                      <th className="py-2 font-medium">N° dosímetro</th>
+                      <th className="py-2 font-medium">Cliente</th>
+                      <th className="py-2 font-medium">Empresa</th>
+                      <th className="py-2 font-medium">Trimestre</th>
+                      <th className="py-2 font-medium">Fecha asig.</th>
+                      <th className="py-2 font-medium">Porta</th>
+                      <th className="py-2 font-medium">Tarea</th>
+                      <th className="py-2 font-medium">Bandeja/Slot</th>
+                      <th className="py-2 font-medium">Trello</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibles.map((a) => (
+                      <tr key={a.id} className="border-b border-slate-100">
+                        <td className="py-2.5 font-medium text-ink">{a.numeroDosimetro}</td>
+                        <td className="py-2.5 text-slate-600">{a.clienteNombre}</td>
+                        <td className="py-2.5 text-slate-600">{a.empresaNombre}</td>
+                        <td className="py-2.5 text-slate-600">{a.trimestre}</td>
+                        <td className="py-2.5 text-slate-600">{a.fechaAsignacion}</td>
+                        <td className="py-2.5 text-slate-600">{a.tipoPortaNombre}</td>
+                        <td className="py-2.5 text-slate-600">{a.numeroTarea || '—'}</td>
+                        <td className="py-2.5 text-slate-600">
+                          {a.numeroBandeja != null ? `${a.numeroBandeja} / ${a.slotBandeja}` : '—'}
+                        </td>
+                        <td className="py-2.5">
+                          {a.linkTrello ? (
+                            <a href={a.linkTrello} target="_blank" rel="noreferrer" className="text-steel hover:underline">Ver</a>
+                          ) : ('—')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+              </div>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   )
 }

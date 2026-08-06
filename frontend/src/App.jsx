@@ -62,7 +62,7 @@ export default function App() {
         <Route path="/usuarios" element={<Navigate to="/usuarios-ejecutivos?tab=usuarios" replace />} />
         <Route
           path="/mis-dosimetros"
-          element={<ProtectedRoute roles={['EJECUTIVO']}><MisDosimetros /></ProtectedRoute>}
+          element={<ProtectedRoute roles={['ADMIN', 'OPERADOR', 'EJECUTIVO']}><MisDosimetros /></ProtectedRoute>}
         />
         {/* "Mis asignaciones" se fusionó en "Mis dosímetros" */}
         <Route path="/mis-asignaciones" element={<Navigate to="/mis-dosimetros" replace />} />

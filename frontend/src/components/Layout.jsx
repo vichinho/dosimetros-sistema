@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { to: '/armar', label: 'Armar', icon: IconBox, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/asignar', label: 'Asignar', icon: IconAssign, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/dosimetros', label: 'Dosímetros', icon: IconSearch, roles: ['ADMIN', 'OPERADOR'] },
+  { to: '/mis-dosimetros', label: 'Asignaciones por cliente', icon: IconAssign, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/pendiente-asignacion', label: 'Pendiente de asignación', icon: IconAssign, roles: ['ADMIN', 'OPERADOR', 'EJECUTIVO'] },
   { to: '/clientes', label: 'Clientes', icon: IconClients, roles: ['ADMIN', 'OPERADOR'] },
   { to: '/duplicados', label: 'Duplicados', icon: IconCopy, roles: ['ADMIN', 'OPERADOR'] },
