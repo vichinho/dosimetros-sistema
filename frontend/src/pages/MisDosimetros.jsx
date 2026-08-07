@@ -164,8 +164,8 @@ export default function MisDosimetros() {
           {esEjecutivo ? 'Mis dosímetros' : 'Asignaciones por cliente'}
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Elige un <b>cliente</b> para ver sus asignaciones. Luego selecciona uno o varios
-          <b> trimestres</b> (y/o una fecha) para filtrar y descargar.
+          Elige un <b>cliente</b>, luego uno o varios <b>trimestres</b> (y/o una fecha). La
+          información se muestra recién al seleccionar los trimestres, para no cargar todo de golpe.
         </p>
       </div>
 
@@ -217,6 +217,13 @@ export default function MisDosimetros() {
             </div>
           </Card>
 
+          {(trimestresSel.size === 0 && !fecha) ? (
+            <Card>
+              <EmptyState>
+                Selecciona uno o más <b>trimestres</b> (o una fecha) para ver y descargar la información.
+              </EmptyState>
+            </Card>
+          ) : (<>
           <Card
             title={`Grupos de asignación por fecha (${grupos.length})`}
             action={
@@ -299,6 +306,7 @@ export default function MisDosimetros() {
               </div>
             )}
           </Card>
+          </>)}
         </>
       )}
     </div>
